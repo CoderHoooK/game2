@@ -297,6 +297,9 @@ async function start(d: Defs, terrainBuf: ArrayBuffer): Promise<void> {
     fps = fps * 0.95 + (1000 / Math.max(1, tk.deltaMS)) * 0.05;
     if (cam.w !== app.screen.width || cam.h !== app.screen.height) cam.resize(app.screen.width, app.screen.height);
     cam.update(tk.deltaMS);
+    // 领土色块：看全图时清楚，拉近后淡出（格子 40 米，近看会变成粗色带）
+    const z = cam.zoom;
+    territory.sprite.alpha = z <= 0.5 ? 1 : z >= 4 ? 0.12 : 1 - 0.88 * (Math.log2(z / 0.5) / 3);
     if (inspector.follow && units.selected >= 0) {
       const p = units.pos(units.selected);
       if (p) cam.center(p[0], p[1]);

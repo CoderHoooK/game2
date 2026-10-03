@@ -96,6 +96,38 @@ await page.evaluate(() => {
 await page.waitForTimeout(3000);
 await shot('g-close');
 
+// ---- 第 1–6 阶段：统计、领土、史册抽屉（四个标签页）、城镇面板
+const st = await page.evaluate(() => {
+  const s = window.__game.stats();
+  return { f: s.factions?.length ?? 0, t: s.towns?.length ?? 0, mood: s.towns?.[0]?.mood };
+});
+console.log(`势力 ${st.f} 个 · 城镇 ${st.t} 座 · 青石城民心 ${st.mood}`);
+if (st.f < 6 || st.t < 12) fail('统计里没有势力 / 城镇');
+const owner = await page.evaluate(() => window.__game.territory());
+if (owner !== 0) fail(`青石城脚下的领土应归青龙（0），实际 ${owner}`);
+await page.click('#terrBtn');
+await page.waitForTimeout(300);
+if (await page.$eval('#terrBtn', (b) => b.classList.contains('on'))) fail('领土按钮关不掉');
+await page.click('#terrBtn');
+for (const tab of ['chronicle', 'lords', 'minds', 'god']) {
+  if (!(await page.isVisible('#drawer'))) await page.click(`[data-drawer="${tab}"]`);
+  else await page.click(`#drawer .tab[data-tab="${tab}"]`);
+  await page.waitForTimeout(tab === 'minds' ? 3500 : 700);
+  const len = await page.$eval('#drawer .dr-body', (el) => el.textContent.trim().length);
+  console.log(`抽屉「${tab}」：${len} 字`);
+  if (len < 20) fail(`抽屉「${tab}」是空的`);
+  await shot('g-drawer-' + tab);
+}
+if (!(await page.$('#drawer svg.relgraph')) && !(await page.$('#drawer .tab.on[data-tab="god"]'))) fail('诸侯关系图没画出来');
+await page.click('#drawer .tab[data-tab="lords"]');
+await page.waitForTimeout(500);
+if (!(await page.$('#drawer svg.relgraph'))) fail('诸侯关系图没画出来');
+await page.click('#legend a[data-town="0"]');
+await page.waitForTimeout(1200);
+const townText = await page.$eval('#inspector', (el) => el.textContent);
+if (!/民心/.test(townText) || !/建筑/.test(townText)) fail('城镇面板没有民心 / 建筑');
+await shot('g-town-panel');
+
 if (errors.length) fail('页面报错：\n' + errors.join('\n'));
 await browser.close();
 if (!process.exitCode) console.log('✓ 游戏冒烟测试通过');
