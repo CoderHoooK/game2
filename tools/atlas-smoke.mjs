@@ -40,7 +40,7 @@ if (await page.evaluate(() => document.querySelector('#drawer').classList.contai
 // 试验台
 await page.goto(url + '#/commands'); await page.waitForTimeout(150);
 const tryLine = async (line) => { await page.fill('#pgInput', line); await page.waitForTimeout(60); return page.evaluate(() => document.querySelector('#pgOut').innerText); };
-let out = await tryLine('攻 @木:5 赤焰.河口镇');
+let out = await tryLine('攻 @木:5 赤焰.落霞镇');
 if (!out.includes('解析成功') || !out.includes('伐木工接不了')) errors.push('试验台：伐木工进攻没给出警告 → ' + out);
 out = await tryLine('派 @木 伐木 火星'); if (!out.includes('没有地点')) errors.push('试验台：错误地点没报错 → ' + out);
 out = await tryLine('灾 旱 北林'); if (!out.includes('不是诸侯能用')) errors.push('试验台：诸侯用上帝命令没拦 → ' + out);

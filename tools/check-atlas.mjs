@@ -96,6 +96,12 @@ for (const p of A.professions) {
   check(p.short.length === 1, `职业 ${p.id} 简称应为一个字`);
   check(P.professionOrders(p, A).length > 0, `职业 ${p.id} 接不了任何长期命令`);
 }
+// 组件 / 长期命令 / 行为 / 命令的状态是可选的（没写 = 草案），写了就必须合法；对不对得上代码由 tests/atlas-sync.test.ts 查
+for (const [kind, list] of [['组件', A.components], ['长期命令', A.orders], ['行为', A.behaviors], ['命令', A.commands]])
+  for (const x of list) check(x.status === undefined || STATUS.has(x.status), `${kind} ${x.id} 状态非法：${x.status}`);
+for (const r of A.roadmap) check(STATUS.has(r.status), `路线图阶段 ${r.stage} 状态非法`);
+for (const d of A.decisions) check(['open', 'decided'].includes(d.status), `待定事项「${d.q}」状态非法`);
+
 
 // 命令：模块存在、长期命令存在、参数类型合法、每个例子都能解析
 const ix = P.index(A);

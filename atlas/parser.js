@@ -180,7 +180,7 @@
     const orderIds = new Set(professionOrders(prof, atlas).map((o) => o.id));
     const myWork = Object.keys(w.works).find((k) => w.works[k] === prof.id);
     const sel = `@${prof.short}:5`;
-    const fill = { town: '青石城', place: '北林', target: '赤焰.河口镇', item: '木头', prof: prof.id === 'soldier' ? '农' : '兵',
+    const fill = { town: '青石城', place: '北林', target: '赤焰.落霞镇', item: '木头', prof: prof.id === 'soldier' ? '农' : '兵',
       group: prof.short + '队', faction: '白鹿', building: '兵营', int: '10', duration: '30天' };
     const out = [];
     for (const c of atlas.commands) {

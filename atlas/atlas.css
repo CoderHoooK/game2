@@ -313,3 +313,10 @@ svg.graph text.sm { fill: var(--muted); font-size: 11px; }
   .hero-units { display: none; }
   #view { padding: 20px 16px 60px; }
 }
+
+/* 代码进度条 */
+.prog { display: grid; grid-template-columns: 44px 1fr 52px; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; color: var(--muted); }
+.prog:hover { color: #fff; }
+.prog-bar { height: 8px; background: rgba(255, 255, 255, 0.07); border-radius: 99px; overflow: hidden; }
+.prog-bar i { display: block; height: 100%; background: linear-gradient(90deg, #34d399, #a5b4fc); border-radius: 99px; }
+.prog b { text-align: right; color: #e2e8f0; font-size: 12px; }

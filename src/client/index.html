@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>诸侯争霸 · 第 0 阶段</title>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <header id="topbar">
+      <div class="brand"><span class="logo">诸</span><div><b>诸侯争霸</b><small>第 0 阶段 · 地基</small></div></div>
+      <div id="clock" class="clock">—</div>
+      <div id="speed" class="seg"></div>
+      <div class="spacer"></div>
+      <div id="perf" class="perf"></div>
+      <a class="btn ghost" href="./atlas/" target="_blank" rel="noopener">架构图谱 ↗</a>
+    </header>
+    <aside id="legend" class="panel"></aside>
+    <aside id="inspector" class="panel" hidden></aside>
+    <section id="console" class="panel">
+      <div id="log"></div>
+      <form id="cmdForm">
+        <select id="who" title="以谁的身份下命令"></select>
+        <input id="cmd" autocomplete="off" spellcheck="false" placeholder="输入命令，如：派 @木:5 伐木 北林   （↑ 历史，Tab 看可用命令）" />
+        <button class="btn" type="submit">执行</button>
+        <button class="btn ghost" type="button" id="cmdHelp" title="可用命令">?</button>
+      </form>
+      <div id="cmdList" hidden></div>
+    </section>
+    <div id="minimapBox" class="panel"><canvas id="minimap" width="200" height="200"></canvas></div>
+    <div id="hint">拖动平移 · 滚轮缩放 · 点小人 / 城镇看详情 · <kbd>Home</kbd> 全图 · <kbd>F</kbd> 跟随</div>
+    <div id="toast"></div>
+    <div id="loading"><div class="spin"></div><span>正在连接世界…</span></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -147,7 +147,15 @@
       ['layers', A.layers.length, '分层'], ['modules', A.modules.length, '模块'], ['npc', A.components.length, '组件'],
       ['professions', A.professions.length, '职业'], ['matrix', A.behaviors.length, '行为'], ['commands', A.commands.length, '命令'],
     ];
-    const cur = A.roadmap.find((r) => r.status === 'wip') || A.roadmap[0];
+    const cur = A.roadmap.find((r) => r.status === 'wip') || A.roadmap.find((r) => r.status !== 'done') || A.roadmap[0];
+    const live = (list) => list.filter((x) => x.status === 'wip' || x.status === 'done').length;
+    const progress = [
+      ['模块', live(A.modules), A.modules.length, '#/modules'],
+      ['职业', live(A.professions), A.professions.length, '#/professions'],
+      ['行为', live(A.behaviors), A.behaviors.length, '#/matrix'],
+      ['命令', A.commands.filter((c) => c.status === 'done').length, A.commands.length, '#/commands'],
+      ['组件', A.components.filter((c) => c.status === 'done').length, A.components.length, '#/npc'],
+    ];
     const dots = A.professions.slice(0, 8).map((p, i) => {
       const y = 30 + (i % 4) * 26; const dur = 4 + (i % 3) * 1.3;
       return `<circle r="5" fill="${p.color}"><animateMotion dur="${dur}s" begin="${-i * 0.7}s" repeatCount="indefinite" path="M60,${y} C120,${y - 18} 180,${y + 18} 240,${y} C180,${y + 20} 120,${y - 20} 60,${y}"/></circle>`;
@@ -174,7 +182,9 @@
       <h2>现在进行到哪</h2>
       <div class="grid g2">
         <div class="card click" ${go('#/roadmap')}><div class="card-title">阶段 ${cur.stage} · ${esc(cur.name)} ${badge(cur.status)}</div><div class="card-text">${esc(cur.text)}</div><div class="card-text">🎯 ${esc(cur.goal)}</div></div>
-        <div class="card click" ${go('#/decisions')}><div class="card-title">待你决定 <span class="badge st-open">${A.decisions.filter((d) => d.status === 'open').length} 项</span></div><div class="card-text">${A.decisions.filter((d) => d.status === 'open').slice(0, 4).map((d) => '· ' + esc(d.q)).join('<br>')}</div></div>
+        <div class="card"><div class="card-title">代码进度 <span class="dim" style="font-weight:400;font-size:12px">和代码自动对照（tests/atlas-sync.test.ts）</span></div>
+          ${progress.map(([name, n, total, href]) => `<div class="prog click" ${go(href)}><span>${name}</span><div class="prog-bar"><i style="width:${Math.round((n / total) * 100)}%"></i></div><b class="mono">${n}/${total}</b></div>`).join('')}</div>
+        ${A.decisions.some((d) => d.status === 'open') ? `<div class="card click" ${go('#/decisions')}><div class="card-title">待你决定 <span class="badge st-open">${A.decisions.filter((d) => d.status === 'open').length} 项</span></div><div class="card-text">${A.decisions.filter((d) => d.status === 'open').slice(0, 4).map((d) => '· ' + esc(d.q)).join('<br>')}</div></div>` : `<div class="card click" ${go('#/decisions')}><div class="card-title">事项都已确认 <span class="badge st-decided">${A.decisions.length} 项</span></div><div class="card-text">${A.decisions.slice(0, 4).map((d) => '· ' + esc(d.q) + ' → ' + esc(d.proposal)).join('<br>')}</div></div>`}
       </div>`;
   };
 
@@ -215,7 +225,7 @@
         </div>
         <div class="stack-side">
           ${row(L('content'))}
-          <div class="rule">📏 <b>规则由测试守着</b><br>向上依赖、绕过模块公开接口（index.ts）都会让 <code>npm test</code> 失败（dependency-cruiser）。</div>
+          <div class="rule">📏 <b>规则由测试守着</b><br>向上依赖、绕过模块公开接口（index.ts）都会让 <code>npm test</code> 失败（tests/arch.test.ts）。</div>
           <div class="rule">🌐 <b>前端只认通信格式</b><br>client 只依赖 protocol 和 shared，绝不碰模拟代码；模拟可以不开画面加速跑。</div>
           <div class="rule">📦 <b>一个 package.json</b><br>不拆多包，层次靠目录 + 依赖检查。</div>
         </div>
@@ -352,7 +362,7 @@
     </table></div>
     <h2>全部行为</h2>
     <div class="grid g3">${A.behaviors.map((b) => `<div class="card click" ${go('#/behaviors/' + b.id)}>
-      <div class="card-title">⚙ ${esc(b.name)} <span class="dim mono">${esc(b.id)}</span><span class="spacer"></span>${ownerChip(b.module)}</div>
+      <div class="card-title">⚙ ${esc(b.name)} <span class="dim mono">${esc(b.id)}</span><span class="spacer"></span>${badge(b.status || 'draft')} ${ownerChip(b.module)}</div>
       <div class="card-text">${esc(b.text)}</div>
       <div class="card-text">完成：${b.support ? '辅助行为（跟在别的行为后面）' : b.fits.map((f) => (f === '*' ? '任何命令（兜底）' : esc(order(f).name))).join('、')}</div></div>`).join('')}</div>`;
 
@@ -360,7 +370,7 @@
   const pg = { text: '派 @木:5 伐木 北林', who: 'lord' };
   let cmdFilter = { who: 'all', q: '' };
   pages.commands = () => {
-    const sampleLines = ['派 @木:5 伐木 北林', '比例 青石城 农50 木20 石10 兵20', '编 @兵@青石城:20 一队', '攻 #一队 赤焰.河口镇', '转 @农:30% 兵', '攻 @木:5 赤焰.河口镇', '信 赤焰 北林归你，河口归我，如何？', '派 @木 伐木 火星'];
+    const sampleLines = ['派 @木:5 伐木 北林', '比例 青石城 农50 木20 石10 兵20', '编 @兵@青石城:20 一队', '攻 #一队 赤焰.落霞镇', '转 @农:30% 兵', '攻 @木:5 赤焰.落霞镇', '信 赤焰 北林归你，河口归我，如何？', '派 @木 伐木 火星'];
     const w = A.sampleWorld;
     return `
       <h1>命令与试验台</h1>
@@ -390,7 +400,7 @@
       return `<h3>${ownerChip(g)}</h3><div class="card" style="padding:4px 8px"><table class="t">${list.map((c) => `<tr class="click cmd-row" ${go('#/commands/' + c.id)}>
         <td><span class="verb">${esc(c.verb)}</span></td>
         <td><code class="muted">${esc(P.signature(c))}</code><div class="muted" style="font-size:12.5px">${esc(c.help)}</div></td>
-        <td style="text-align:right;white-space:nowrap">${c.order ? `<span class="chip mono">→ ${esc(c.order)}</span>` : ''}${c.who.map((x) => `<span class="badge st-${x === 'god' ? 'open' : 'draft'}">${WHO[x]}</span>`).join(' ')}</td></tr>`).join('')}</table></div>`;
+        <td style="text-align:right;white-space:nowrap">${c.status === 'done' ? badge('done') + ' ' : ''}${c.order ? `<span class="chip mono">→ ${esc(c.order)}</span>` : ''}${c.who.map((x) => `<span class="badge st-${x === 'god' ? 'open' : 'draft'}">${WHO[x]}</span>`).join(' ')}</td></tr>`).join('')}</table></div>`;
     }).join('') || '<p class="muted">没有匹配的命令</p>';
   }
   function aiCommandTable() {
@@ -563,7 +573,7 @@
     const argsCode = c.args.map(([n, t]) => (n.endsWith('?') ? `${t}('${n.replace('?', '')}', { optional: true })` : `${t}('${n}')`)).join(', ');
     const code = `export const ${c.id}: CommandDef = {\n  id: '${c.id}', verb: '${c.verb}', module: '${c.module}',\n  who: ${lit(c.who)},\n  args: [${argsCode}],${o ? `\n  order: '${o.id}',` : ''}\n  help: '${c.help}',\n  examples: ${lit(c.examples)},\n  run(ctx, args) { /* 校验 → 执行（写长期命令 / 调动作）→ 返回结果 */ },\n};`;
     return { kind: '命令', title: `<span class="verb" style="font-size:28px">${esc(c.verb)}</span> <span class="dim mono" style="font-size:15px">${esc(c.id)}</span>`,
-      sub: `${ownerChip(c.module)} ${c.who.map((x) => `<span class="badge st-${x === 'god' ? 'open' : 'draft'}">${WHO[x]}</span>`).join(' ')}`,
+      sub: `${badge(c.status || 'draft')} ${ownerChip(c.module)} ${c.who.map((x) => `<span class="badge st-${x === 'god' ? 'open' : 'draft'}">${WHO[x]}</span>`).join(' ')}`,
       body: `<p>${esc(c.help)}</p>
         <h3>格式</h3><pre class="code">${esc(P.signature(c))}</pre>
         <h3>参数</h3><table class="t"><tr><th>参数</th><th>类型</th><th>必填</th></tr>${c.args.map(([n, t]) => `<tr><td>${esc(n.replace('?', ''))}</td><td><code>${esc(t)}</code> <span class="muted">${esc(P.TYPES[t].name)}</span></td><td>${n.endsWith('?') ? '<span class="dim">可省略</span>' : '是'}</td></tr>`).join('')}</table>
@@ -595,7 +605,7 @@
   drawers.behaviors = (b) => {
     const ps = A.professions.filter((p) => p.behaviors.includes(b.id));
     const code = `export const ${b.id}: BehaviorDef = {\n  id: '${b.id}',\n  fits(npc, order, ctx) { /* ${b.support ? '辅助行为：由前一个行为接力调用，这里返回 0' : '能完成 ' + b.fits.join(' / ') + ' 时返回优先级，做不了返回 0'} */ },\n  start(npc, ctx) { },\n  tick(npc, ctx) { /* ${b.loop.join(' → ')} */ return 'running'; },\n  coarse(npc, ctx, dt) { /* 远处粗算：按时间推进 */ },\n};`;
-    return { kind: '行为 Behavior', title: `⚙ ${esc(b.name)} <span class="dim mono" style="font-size:15px">${esc(b.id)}</span>`, sub: `${ownerChip(b.module)} ${b.coarse ? '<span class="chip">支持远处粗算</span>' : ''}`,
+    return { kind: '行为 Behavior', title: `⚙ ${esc(b.name)} <span class="dim mono" style="font-size:15px">${esc(b.id)}</span>`, sub: `${badge(b.status || 'draft')} ${ownerChip(b.module)} ${b.coarse ? '<span class="chip">支持远处粗算</span>' : ''}`,
       body: `<p>${esc(b.text)}</p>
         <h3>循环</h3><div class="loop">${b.loop.map((s) => `<span>${esc(s)}</span>`).join('')}</div>
         <h3>能完成的长期命令</h3>${b.support ? '<span class="chip">辅助行为：不单独完成命令，跟在采集、耕种后面自动接上</span>' : b.fits.map((f) => (f === '*' ? '<span class="chip">任何命令（兜底）</span>' : orderChip(order(f)))).join('')}

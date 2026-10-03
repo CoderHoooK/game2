@@ -3,10 +3,35 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "start": "vite build && tsx src/server/main.ts",
+    "serve": "tsx src/server/main.ts",
+    "build": "vite build",
+    "dev:server": "tsx watch src/server/main.ts",
+    "dev:client": "vite",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run && node tools/check-atlas.mjs",
+    "bench": "tsx tools/bench.ts",
+    "check": "npm run typecheck && npm test && npm run bench && npm run atlas",
     "atlas": "node tools/check-atlas.mjs && node tools/build-atlas.mjs",
     "atlas:check": "node tools/check-atlas.mjs",
     "atlas:serve": "node tools/serve-atlas.mjs",
     "atlas:smoke": "node tools/atlas-smoke.mjs",
-    "test": "node tools/check-atlas.mjs"
+    "smoke": "node tools/game-smoke.mjs"
+  },
+  "dependencies": {
+    "pixi.js": "^8.22.0",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/ws": "^8.18.2",
+    "playwright": "^1.47.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=20.19"
   }
 }
