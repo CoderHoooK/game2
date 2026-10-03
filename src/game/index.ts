@@ -7,9 +7,12 @@ import { economy } from './modules/economy';
 import { population } from './modules/population';
 import { jobs } from './modules/jobs';
 import { military } from './modules/military';
+import { building } from './modules/building';
+import { diplomacy } from './modules/diplomacy';
+import { chronicle } from './modules/chronicle';
 import { god } from './modules/god';
 
-export const MODULES: GameModule[] = [world, economy, population, jobs, military, god];
+export const MODULES: GameModule[] = [world, economy, population, jobs, building, diplomacy, military, chronicle, god];
 
 export function createGame(opts: SimOptions): Sim {
   return createSim(MODULES, opts);
@@ -19,6 +22,10 @@ export type { WorldApi, Place } from './modules/world';
 export type { EconomyApi } from './modules/economy';
 export type { PopulationApi, Town, Faction } from './modules/population';
 export type { JobsApi, NpcInfo } from './modules/jobs';
-export { Identity } from './modules/population';
+export type { BuildingApi, Site } from './modules/building';
+export type { DiplomacyApi, Message, Treaty } from './modules/diplomacy';
+export type { MilitaryApi, Intel } from './modules/military';
+export type { ChronicleApi, Entry, Thought } from './modules/chronicle';
+export { Identity, Vitals, Notable } from './modules/population';
 export { Profession } from './modules/jobs';
 export { Carry } from './modules/economy';

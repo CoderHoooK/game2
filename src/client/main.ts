@@ -3,13 +3,15 @@
 import './style.css';
 import { Application, Container } from 'pixi.js';
 import type { Defs, InspectInfo, ServerMsg, StatsMsg } from '../protocol/messages';
-import { BIN, decodeChunk, decodeNodes, decodeTerrain, decodeUnits } from '../protocol/codec';
+import { BIN, decodeChunk, decodeNodes, decodeTerrain, decodeTerritory, decodeUnits } from '../protocol/codec';
 import { Net } from './net';
 import { Camera } from './camera';
 import { TerrainLayer } from './layers/terrain';
 import { NodesLayer } from './layers/nodes';
 import { TownsLayer } from './layers/towns';
 import { UnitsLayer } from './layers/units';
+import { TerritoryLayer } from './layers/territory';
+import { Drawer } from './panels/drawer';
 import { Inspector } from './panels/inspector';
 import { Console } from './panels/console';
 import { Minimap } from './panels/minimap';
@@ -23,6 +25,8 @@ interface Game {
   nodes: NodesLayer;
   towns: TownsLayer;
   units: UnitsLayer;
+  territory: TerritoryLayer;
+  drawer: Drawer;
   inspector: Inspector;
   console: Console;
   minimap: Minimap;
@@ -46,6 +50,8 @@ const net = new Net({
     if (!game) return;
     if (m.t === 'stats') onStats(m);
     else if (m.t === 'result') game.console.result(m.id, m.ok, m.msg, m.warns, m.hint);
+    else if (m.t === 'chronicle') game.drawer.addEntries(m.entries);
+    else if (m.t === 'ailog') game.drawer.setMind(m);
     else if (m.t === 'inspect' && m.id === game.units.selected) {
       lastInfo = m.info;
       game.inspector.showNpc(m.info);
@@ -78,6 +84,34 @@ function onBin(tag: number, buf: ArrayBuffer): void {
     const c = decodeChunk(buf);
     g.terrain.addChunk(c.cx, c.cy, c.n, c.cells);
   } else if (tag === BIN.nodes) g.nodes.draw(decodeNodes(buf, g.defs.size));
+  else if (tag === BIN.territory) {
+    const t = decodeTerritory(buf);
+    g.territory.apply(t.size, t.data);
+    paintOwners();
+  }
+}
+
+/** 势力颜色（新势力会冒出来）+ 每座城现在归谁 → 城镇、领土、小地图一起重画 */
+function paintOwners(): void {
+  const g = game!;
+  const fs = stats?.factions ?? g.defs.factions;
+  const colors = g.defs.towns.map((t, i) => fs[stats?.towns[i]?.faction ?? t.faction]?.color ?? '#999');
+  g.towns.recolor(colors);
+  g.territory.draw(fs);
+  g.minimap.paint(colors, g.territory.visible ? g.territory.canvas : null, `${colors.join(',')}|${fs.length}|${g.territory.visible}|${g.territory.version}`);
+}
+
+/** 顶栏走马灯：最近一条天下大事 */
+let lastNews = 0;
+function ticker(): void {
+  const e = game!.drawer.latest(1)[0];
+  if (!e || e.id === lastNews) return;
+  lastNews = e.id;
+  const el = $('#news');
+  el.textContent = e.text;
+  el.classList.remove('flash');
+  void el.offsetWidth;
+  el.classList.add('flash');
 }
 
 let lastInfo: InspectInfo | null = null;
@@ -94,7 +128,14 @@ function onStats(s: StatsMsg): void {
     `<span title="收到的数据量">⇣ ${(kbps).toFixed(0)} KB/s</span>`;
   document.querySelectorAll<HTMLElement>('#speed button').forEach((b) => b.classList.toggle('on', Number(b.dataset.n) === s.speed));
   g.legend.counts(s);
-  if (g.inspector.townId >= 0) g.inspector.showTown(g.inspector.townId, s);
+  if (g.inspector.townId >= 0 && g.units.selected < 0) g.inspector.showTown(g.inspector.townId, s);
+  g.drawer.addEntries(s.chronicle);
+  g.drawer.update(s);
+  g.console.setFactions(s.factions.filter((f) => f.alive && (f.kind === 'lord' || f.kind === 'rebel')).map((f) => f.name));
+  paintOwners();
+  ticker();
+  const mind = g.drawer.wantsMind();
+  if (mind && s.tick % 30 < 12) net.send({ t: 'ailog', faction: mind });
 }
 
 let fps = 60;
@@ -115,7 +156,8 @@ async function start(d: Defs, terrainBuf: ArrayBuffer): Promise<void> {
   const nodes = new NodesLayer(d);
   const towns = new TownsLayer(d);
   const units = new UnitsLayer(d);
-  world.addChild(terrain.root, nodes.g, towns.world, units.root);
+  const territory = new TerritoryLayer(d);
+  world.addChild(terrain.root, territory.sprite, nodes.g, towns.world, units.root);
   screen.addChild(towns.screen);
   app.stage.addChild(world, screen);
 
@@ -129,7 +171,10 @@ async function start(d: Defs, terrainBuf: ArrayBuffer): Promise<void> {
   };
   const inspector = new Inspector(d, {
     close: () => select(-1),
-    fill: (line) => game!.console.fill(line),
+    fill: (line, as) => {
+      if (as !== undefined) game!.console.setWho(as);
+      game!.console.fill(line);
+    },
     follow: (on) => on && units.selected >= 0 && cam.zoom < 3 && cam.flyTo(cam.cx, cam.cy, 4),
   });
   const consoleP = new Console(d, (id, line, as) => net.send({ t: 'cmd', id, line, as }));
@@ -143,7 +188,36 @@ async function start(d: Defs, terrainBuf: ArrayBuffer): Promise<void> {
       inspector.showTown(id, stats);
     },
   });
-  game = { defs: d, cam, terrain, nodes, towns, units, inspector, console: consoleP, minimap, legend };
+  const drawer = new Drawer(d, {
+    fill: (line, asGod) => {
+      if (asGod) consoleP.setWho(null);
+      consoleP.fill(line);
+    },
+    ailog: (faction) => net.send({ t: 'ailog', faction }),
+    town: (name) => {
+      const t = d.towns.find((x) => x.name === name);
+      if (!t) return;
+      cam.flyTo(t.x, t.y, 2.2);
+      units.selected = -1;
+      inspector.showTown(t.id, stats);
+    },
+  });
+  game = { defs: d, cam, terrain, nodes, towns, units, territory, drawer, inspector, console: consoleP, minimap, legend };
+  document.querySelectorAll<HTMLElement>('[data-drawer]').forEach((b) =>
+    b.addEventListener('click', () => {
+      const tab = b.dataset.drawer as 'chronicle';
+      if (drawer.open && (drawer as unknown as { tab: string }).tab === tab) drawer.toggle(false);
+      else drawer.show(tab);
+    }),
+  );
+  $('#terrBtn').addEventListener('click', () => toggleTerritory());
+  const toggleTerritory = () => {
+    territory.visible = !territory.visible;
+    territory.sprite.visible = territory.visible;
+    $('#terrBtn').classList.toggle('on', territory.visible);
+    paintOwners();
+  };
+  $('#terrBtn').classList.add('on');
   for (const b of early.splice(0)) onBin(new Uint8Array(b, 0, 1)[0], b);
 
   // 速度按钮：发的是上帝的"时速"命令（和命令框同一条路）
@@ -194,6 +268,8 @@ async function start(d: Defs, terrainBuf: ArrayBuffer): Promise<void> {
     const step = 120;
     if (ev.key === 'Home') cam.fitAll();
     else if (ev.key === 'Escape') select(-1);
+    else if (ev.key === 't' || ev.key === 'T') toggleTerritory();
+    else if (ev.key === 'j' || ev.key === 'J') drawer.open ? drawer.toggle(false) : drawer.show('chronicle');
     else if (ev.key === 'f' || ev.key === 'F') (inspector.follow = !inspector.follow), select(units.selected);
     else if (ev.key === 'ArrowLeft' || ev.key === 'a') cam.pan(step, 0);
     else if (ev.key === 'ArrowRight' || ev.key === 'd') cam.pan(-step, 0);
@@ -252,6 +328,8 @@ async function start(d: Defs, terrainBuf: ArrayBuffer): Promise<void> {
     cam,
     units,
     stats: () => stats,
+    drawer,
+    territory: () => territory.ownerAt(d.towns[0].x, d.towns[0].y),
     info: () => lastInfo,
     chunks: () => terrain.chunkCount,
     townsXY: () => d.towns.map((t) => [Math.round(t.x), Math.round(t.y)]),

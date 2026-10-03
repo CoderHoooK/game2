@@ -1,5 +1,5 @@
 // 二进制帧：第一个字节是类型。坐标量化成 u16（10 公里 / 65535 ≈ 0.15 米）。
-export const BIN = { units: 1, terrain: 2, chunk: 3, nodes: 4 } as const;
+export const BIN = { units: 1, terrain: 2, chunk: 3, nodes: 4, territory: 5 } as const;
 const UNIT_BYTES = 12;
 
 export interface UnitsFrame {
@@ -123,4 +123,20 @@ export function decodeNodes(buf: ArrayBuffer, size: number): { n: number; x: Flo
     out.level[i] = dv.getUint8(o + 5) / 255;
   }
   return out;
+}
+
+/** 领土栅格：[类型 u8][3 字节空][版本 u32][边长 u16][2 字节空][边长² 个 u8：势力序号，255 = 无主] */
+export function encodeTerritory(version: number, size: number, data: Uint8Array): ArrayBuffer {
+  const buf = new ArrayBuffer(12 + size * size);
+  const dv = new DataView(buf);
+  dv.setUint8(0, BIN.territory);
+  dv.setUint32(4, version, true);
+  dv.setUint16(8, size, true);
+  new Uint8Array(buf, 12).set(data.subarray(0, size * size));
+  return buf;
+}
+export function decodeTerritory(buf: ArrayBuffer): { version: number; size: number; data: Uint8Array } {
+  const dv = new DataView(buf);
+  const size = dv.getUint16(8, true);
+  return { version: dv.getUint32(4, true), size, data: new Uint8Array(buf, 12, size * size) };
 }

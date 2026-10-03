@@ -10,8 +10,8 @@ import { Motion } from './motion';
 export const Brain = defineComponent(
   'Brain',
   '大脑',
-  { beh: 'u8', step: 'u8', timer: 'f32', target: 'i32', order: 'u32', def: 'u32', kit: 'u16' },
-  { beh: '当前行为（0 = 空闲）', step: '行为进行到第几步', timer: '读条计时', target: '行为目标', order: '所属长期命令', def: '平时的长期命令（放了以后回到它）', kit: '行为表' },
+  { beh: 'u8', step: 'u8', timer: 'f32', target: 'i32', target2: 'i32', order: 'u32', def: 'u32', kit: 'u16' },
+  { beh: '当前行为（0 = 空闲）', step: '行为进行到第几步', timer: '读条计时', target: '行为目标', target2: '第二个目标（如搬运的目的地）', order: '所属长期命令', def: '平时的长期命令（放了以后回到它）', kit: '行为表' },
 );
 export const Membership = defineComponent('Membership', '编组', { group: 'u16', pinned: 'u8' }, { group: '所在队伍（0 = 无）', pinned: '是否锁定（直接派出去的人）' });
 
@@ -154,6 +154,22 @@ export class Brains {
   }
   orderCount(): number {
     return this.orders.size;
+  }
+  /** 存档：所有长期命令（参数里的地点等对象原样存，要求能 JSON 化） */
+  exportOrders(): { next: number; list: Order[] } {
+    return { next: this.nextOrder, list: [...this.orders.values()] };
+  }
+  importOrders(data: { next: number; list: Order[] }): void {
+    this.orders.clear();
+    for (const o of data.list) this.orders.set(o.id, o);
+    this.nextOrder = data.next;
+  }
+  /** 改一条长期命令的参数（同一编组的人立刻跟着变） */
+  updateOrder(id: number, params: Record<string, unknown>, label?: string): void {
+    const o = this.orders.get(id);
+    if (!o) return;
+    Object.assign(o.params, params);
+    if (label) o.label = label;
   }
 
   /** 某个行为表能接哪些长期命令（推导"职业能接哪些命令"用） */

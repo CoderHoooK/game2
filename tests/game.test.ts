@@ -1,13 +1,13 @@
 // 玩法规则：世界生成、开局、命令契约（每条命令的例子都要真能跑通）、干活出产、可重现。
 import { describe, it, expect, beforeAll } from 'vitest';
-import { createGame, MODULES, type WorldApi, type PopulationApi, type JobsApi, type EconomyApi } from '../src/game';
+import { createGame, MODULES, Notable, type WorldApi, type PopulationApi, type JobsApi, type EconomyApi } from '../src/game';
 import type { Sim } from '../src/engine/sim';
 import { FACTIONS, FIXED_PLACES, FIXED_PEOPLE } from '../content/factions';
 import { PROFESSIONS, START_RATIO } from '../content/professions';
 
 const lord = (faction = '青龙') => ({ role: 'lord' as const, faction, origin: 'test' as const });
 const god = { role: 'god' as const, origin: 'test' as const };
-const SETUP = ['编 @兵@青石城:20 一队', '编 @兵@河口镇:10 二队'];
+const SETUP = ['编 @兵@青石城:20 一队', '编 @兵@河口镇:10 二队', '编 @兵:5 三队', '编 @商:2 商队'];
 
 let sim: Sim;
 let W: WorldApi;
@@ -35,9 +35,9 @@ describe('世界生成', () => {
     for (const [n] of FIXED_PLACES) expect(W.place(n), n).toBeTruthy();
   });
   it('每个诸侯两座城镇，都在陆地上、各占一个地区、离得够远', () => {
-    expect(P.factions.map((f) => f.name)).toEqual(FACTIONS.map((f) => f.name));
+    expect(P.livingFactions().map((f) => f.name)).toEqual(FACTIONS.map((f) => f.name));
     expect(P.towns.length).toBe(FACTIONS.length * 2);
-    for (const f of P.factions) expect(f.towns.length).toBe(2);
+    for (const f of P.livingFactions()) expect(f.towns.length).toBe(2);
     const regions = new Set<number>();
     for (const t of P.towns) {
       expect(W.isLand(t.x, t.y), t.name).toBe(true);
@@ -76,10 +76,11 @@ describe('世界生成', () => {
 
 describe('开局', () => {
   it('2000 个 NPC，每人都挂齐通用模板的组件', () => {
-    const npcs = P.npcs();
+    const npcs = P.npcs().filter((e) => !sim.world.has(e, Notable));
     expect(npcs.length).toBe(2000);
+    expect(P.notables().length).toBeGreaterThan(10);
     const comps = Object.keys(J.describe(npcs[0]).components).sort();
-    expect(comps).toEqual(['Brain', 'Carry', 'Identity', 'Lod', 'Membership', 'Motion', 'Profession', 'Transform', 'Vitals']);
+    expect(comps).toEqual(['Brain', 'Carry', 'Combat', 'Equipment', 'Identity', 'Lod', 'Membership', 'Motion', 'Profession', 'Transform', 'Vitals']);
   });
   it('职业比例按配置，固定人物都在青龙', () => {
     const counts = J.countByProf();
@@ -111,6 +112,7 @@ describe('命令契约', () => {
   it('每条命令的每个例子都能跑通', () => {
     const s = createGame({ seed: 1 });
     for (const l of SETUP) expect(s.bus.exec(l, lord()).ok, l).toBe(true);
+    expect(s.bus.exec('约 青龙 互不侵犯 30天', lord('赤焰')).ok).toBe(true);
     const fails: string[] = [];
     for (const c of s.bus.list()) {
       for (const ex of c.examples) {
@@ -119,7 +121,7 @@ describe('命令契约', () => {
         if (!r.ok) fails.push(`${ex} → ${r.msg}`);
       }
     }
-    expect(fails).toEqual([]);
+    if (fails.length) throw new Error(fails.join('\n'));
   });
   it('每条命令都声明了模块、动词、帮助和例子', () => {
     for (const c of sim.bus.list()) {
@@ -150,7 +152,7 @@ describe('命令契约', () => {
     expect(r.ok).toBe(false);
   });
   it('写错了给提示', () => {
-    expect(sim.bus.exec('攻 #一队 赤焰城', lord()).msg).toMatch(/不认识的命令/);
+    expect(sim.bus.exec('飞 #一队 赤焰城', lord()).msg).toMatch(/不认识的命令/);
     expect(sim.bus.exec('派 @木:5 伐木 火星', lord()).msg).toMatch(/火星/);
     expect(sim.bus.exec('编 @兵:3 三队', god).ok).toBe(false);
   });
@@ -163,17 +165,18 @@ describe('命令契约', () => {
 });
 
 describe('干活', () => {
-  it('跑十五天后各诸侯主城的粮和木头都涨了', () => {
+  it('跑十五天后各诸侯主城的粮涨了，木头 + 金也涨了（多余的木头会被商人卖掉换金）', () => {
     const s = createGame({ seed: 1 });
     const eco = s.service<EconomyApi>('economy');
     const pop = s.service<PopulationApi>('population');
     const caps = pop.towns.filter((t) => t.capital);
     const sum = (t: (typeof caps)[number], item: string) => eco.stores[t.store].stock[eco.itemIndex(item)];
-    const before = caps.map((t) => [sum(t, 'food'), sum(t, 'wood')]);
+    const before = caps.map((t) => [sum(t, 'food'), sum(t, 'wood') + sum(t, 'gold')]);
     s.run(1500);
     caps.forEach((t, i) => {
       expect(sum(t, 'food'), `${t.name} 粮`).toBeGreaterThan(before[i][0]);
-      expect(sum(t, 'wood'), `${t.name} 木`).toBeGreaterThan(before[i][1]);
+      expect(sum(t, 'wood') + sum(t, 'gold'), `${t.name} 木+金`).toBeGreaterThan(before[i][1]);
+      expect(sum(t, 'wood'), `${t.name} 木`).toBeGreaterThan(150);
     });
     expect(s.brains.orderCount()).toBeLessThan(200);
   });

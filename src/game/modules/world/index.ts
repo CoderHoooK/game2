@@ -56,7 +56,19 @@ export interface WorldApi {
   renameRegion(id: number, name: string): void;
   /** 附近一个陆地上的随机点（试几次，找不到就返回原点） */
   landPointNear(x: number, y: number, r: number, rng: Rng): [number, number];
+  /** 地区效果（天灾等）：到 until 拍为止 */
+  addEffect(region: number, id: string, until: number): void;
+  effects(region: number): string[];
+  /** 资源恢复倍率（建筑：伐木场 ×3 等） */
+  setRegenMul(region: number, kindKey: string, mul: number): void;
+  /** 某种资源点在某地区现在的恢复倍率（季节 × 天灾 × 建筑） */
+  regenMul(kind: number, region: number): number;
+  /** 某地区里某种资源点的列表 */
+  nodesIn(region: number, kindKey?: string): number[];
 }
+
+/** 天灾对资源恢复的影响：效果 ID → 不长的资源种类 */
+const EFFECT_STOPS: Record<string, string[]> = { drought: ['field', 'wood'], flood: ['field'], locust: ['field'] };
 
 export const world: GameModule = {
   id: 'world',
@@ -71,8 +83,42 @@ export const world: GameModule = {
     { id: 'resources', text: '资源点' },
     { id: 'regions', text: '地区名与中心' },
   ],
-  events: [{ id: 'resource.depleted', module: 'world', text: '资源点被采空' }],
+  events: [
+    { id: 'resource.depleted', module: 'world', text: '资源点被采空' },
+    { id: 'season.changed', module: 'world', text: '换季（冬天田里不长粮）' },
+  ],
+  systems: [
+    {
+      id: 'world.season',
+      phase: 'post',
+      every: 100,
+      run(sim) {
+        const c = sim.clock;
+        if (c.day > 0 && c.day % c.daysPerSeason === 0) sim.events.emit('season.changed', c.tick, { season: c.season, year: c.year });
+      },
+    },
+  ],
+  save: {
+    version: 1,
+    save(sim) {
+      const w = sim.service<WorldApi & { _state(): unknown }>('world');
+      return w._state();
+    },
+    load(sim, data) {
+      sim.service<WorldApi & { _load(d: unknown): void }>('world')._load(data);
+    },
+  },
   argTypes: [
+    {
+      id: 'duration',
+      name: '时长',
+      parse(tok) {
+        const m = /^(\d+)(天|日|月|年)?$/.exec(tok);
+        if (!m) return { ok: false, error: `「${tok}」不是时长`, hint: '如 10天、2月（30 天）、1年（120 天）' };
+        const n = +m[1] * (m[2] === '月' ? 30 : m[2] === '年' ? 120 : 1);
+        return n > 0 && n <= 3600 ? { ok: true, value: n } : { ok: false, error: '时长要在 1 天到 30 年之间' };
+      },
+    },
     {
       id: 'place',
       name: '地点',
@@ -115,6 +161,9 @@ export const world: GameModule = {
     const kindIndex = new Map(RESOURCE_KINDS.map((k) => [k.key, k.id]));
     const places = new Map<string, Place>();
     const chunkCache = new Map<number, Uint8Array>();
+    const effects = new Map<number, Map<string, number>>();
+    const regenMuls = new Map<string, number>();
+    const byRegion = new Map<number, number[]>();
     const chunkCells = 64;
     const cellSize = 2;
     const px = map.px;
@@ -159,6 +208,9 @@ export const world: GameModule = {
         nodes.amount.push(full ? RESOURCE_KINDS[k].max : 0);
         nodes.last.push(sim.clock.tick);
         grids[k].insert(id, x, y);
+        const r = nodes.region[id];
+        if (!byRegion.has(r)) byRegion.set(r, []);
+        byRegion.get(r)!.push(id);
         return id;
       },
       level(n) {
@@ -166,10 +218,34 @@ export const world: GameModule = {
         const now = sim.clock.tick;
         const dt = (now - nodes.last[n]) / sim.clock.hz;
         if (dt > 0) {
-          nodes.amount[n] = Math.min(k.max, nodes.amount[n] + k.regen * dt);
+          nodes.amount[n] = Math.min(k.max, nodes.amount[n] + k.regen * dt * api2.regenMul(nodes.kind[n], nodes.region[n]));
           nodes.last[n] = now;
         }
         return nodes.amount[n];
+      },
+      addEffect(region, id, until) {
+        if (!effects.has(region)) effects.set(region, new Map());
+        const m = effects.get(region)!;
+        m.set(id, Math.max(m.get(id) ?? 0, until));
+      },
+      effects(region) {
+        const m = effects.get(region);
+        if (!m) return [];
+        const now = sim.clock.tick;
+        return [...m.entries()].filter(([, u]) => u > now).map(([id]) => id);
+      },
+      setRegenMul(region, kindKey, mul) {
+        regenMuls.set(`${region}:${kindIndex.get(kindKey)}`, mul);
+      },
+      regenMul(kind, region) {
+        const key = RESOURCE_KINDS[kind].key;
+        if (key === 'field' && sim.clock.season === '冬') return 0;
+        for (const id of api2.effects(region)) if (EFFECT_STOPS[id]?.includes(key)) return 0;
+        return regenMuls.get(`${region}:${kind}`) ?? 1;
+      },
+      nodesIn(region, kindKey) {
+        const k = kindKey === undefined ? -1 : kindIndex.get(kindKey);
+        return (byRegion.get(region) || []).filter((n) => k === -1 || nodes.kind[n] === k);
       },
       nearestNode(kindKey, x, y, maxDist, region, min = 1) {
         const k = kindIndex.get(kindKey);
@@ -252,6 +328,31 @@ export const world: GameModule = {
     api.provideHooks({
       speedAt: (x, y) => TERRAINS[map.biome[pix(x, y)]].speed,
       regionAt: api2.regionAt,
+    });
+    // 存档：资源点（建筑会新增田，所以整份存）、地区效果、恢复倍率
+    const baseNodes = () => nodes.count;
+    let generated = 0;
+    Object.assign(api2, {
+      _state: () => ({
+        generated,
+        extra: nodes.kind.slice(generated).map((k, i) => [k, nodes.x[generated + i], nodes.y[generated + i]]),
+        amount: [...nodes.amount],
+        last: [...nodes.last],
+        effects: [...effects.entries()].map(([r, m]) => [r, [...m.entries()]]),
+        regen: [...regenMuls.entries()],
+      }),
+      _load(d: { generated: number; extra: [number, number, number][]; amount: number[]; last: number[]; effects: [number, [string, number][]][]; regen: [string, number][] }) {
+        // 开局之后新增的资源点（农田等）补回来
+        for (const [k, x, y] of d.extra.slice(nodes.count - d.generated)) api2.addNode(RESOURCE_KINDS[k].key, x, y);
+        for (let i = 0; i < nodes.count; i++) ((nodes.amount[i] = d.amount[i] ?? nodes.amount[i]), (nodes.last[i] = d.last[i] ?? nodes.last[i]));
+        effects.clear();
+        for (const [r, list] of d.effects) effects.set(r, new Map(list));
+        regenMuls.clear();
+        for (const [k, v] of d.regen) regenMuls.set(k, v);
+      },
+    });
+    api.onStart(() => {
+      generated = baseNodes();
     });
     api.expose(api2);
   },

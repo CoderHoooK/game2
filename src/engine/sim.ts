@@ -58,6 +58,7 @@ export class Sim {
       'engine',
     );
     this.addAction({ id: 'wait', text: '原地读条', run: () => ({ ok: true }) }, 'engine');
+    this.addAction({ id: 'stop', text: '停下', run: (sim: Sim, e: number) => ((sim.world.get(Motion).moving[e] = 0), { ok: true }) }, 'engine');
   }
 
   addAction(def: ActionDef, module: string): void {

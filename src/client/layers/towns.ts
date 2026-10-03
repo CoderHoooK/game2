@@ -13,15 +13,38 @@ export class TownsLayer {
   private regionLabels: { t: Text; x: number; y: number }[] = [];
   private regionBox = new Container();
 
+  private colorKey = '';
   constructor(private defs: Defs) {
-    for (const t of defs.towns) {
-      const c = hex(defs.factions[t.faction].color);
+    this.drawTowns(defs.towns.map((t) => defs.factions[t.faction].color));
+    this.initLabels();
+  }
+
+  /** 城换主 / 新势力：按每座城现在的颜色重画 */
+  recolor(colors: string[]): void {
+    if (colors.join(',') === this.colorKey) return;
+    this.drawTowns(colors);
+    this.labels.forEach((l, i) => {
+      l.t.style.fill = hex(colors[i]);
+      const s = this.defs.towns[i].capital ? 7 : 5;
+      l.dot.clear().poly([0, -s, s, 0, 0, s, -s, 0]).fill({ color: hex(colors[i]) }).stroke({ width: 1.5, color: 0x000000, alpha: 0.7 });
+    });
+  }
+
+  private drawTowns(colors: string[]): void {
+    this.colorKey = colors.join(',');
+    this.world.clear();
+    for (const t of this.defs.towns) {
+      const c = hex(colors[t.id]);
       const r = t.radius;
       this.world.rect(t.x - r, t.y - r, r * 2, r * 2).fill({ color: c, alpha: 0.16 }).stroke({ width: 2.2, color: c, alpha: 0.9 });
       if (t.capital) this.world.rect(t.x - r - 4, t.y - r - 4, r * 2 + 8, r * 2 + 8).stroke({ width: 1.2, color: c, alpha: 0.7 });
       this.world.rect(t.x - 7, t.y - 7, 14, 14).fill({ color: c, alpha: 0.85 }).stroke({ width: 1, color: 0x000000, alpha: 0.6 });
       for (const [dx, dy] of [[-r, -r], [r, -r], [-r, r], [r, r]]) this.world.rect(t.x + dx - 3.5, t.y + dy - 3.5, 7, 7).fill({ color: c });
     }
+  }
+
+  private initLabels(): void {
+    const defs = this.defs;
     for (const r of defs.regions) {
       const t = new Text({ text: r.name, style: { fontFamily: FONT, fontSize: 11, fill: 0xffffff, stroke: { color: 0x000000, width: 3 } } });
       t.alpha = 0.55;

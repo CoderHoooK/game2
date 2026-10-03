@@ -1,6 +1,6 @@
 // 前后端消息格式（共用同一份类型：改了一边，另一边编译就报错）。
 // 小而频繁的数据（单位位置、地形、资源点）走二进制，见 codec.ts；其余走 JSON。
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 export interface Defs {
   seed: number;
@@ -20,6 +20,57 @@ export interface Defs {
   /** 行为表：单位状态字节 = 下标 + 1（0 = 空闲） */
   behaviors: { id: string; name: string }[];
   commands: { verb: string; signature: string; help: string; examples: string[]; who: string[]; module: string }[];
+  buildings: { id: string; name: string; text: string }[];
+}
+
+export interface TownStat {
+  faction: number;
+  capital: boolean;
+  pop: number;
+  cap: number;
+  mood: number;
+  tax: number;
+  walls: number;
+  /** 已建成：建筑 ID → 座数 */
+  buildings: Record<string, number>;
+  /** 工地：建筑名 + 进度 0–1 */
+  sites: { name: string; progress: number }[];
+  /** 被围的进度 0–1（没被围 = 不写） */
+  siege?: { by: number; progress: number };
+}
+export interface FactionStat {
+  name: string;
+  color: string;
+  kind: string;
+  alive: boolean;
+  reputation: number;
+  soldiers: number;
+  from?: string;
+}
+export interface RelationStat {
+  a: number;
+  b: number;
+  value: number;
+  war: boolean;
+  treaties: string[];
+  trades: number;
+}
+export interface ChronicleEntry {
+  id: number;
+  tick: number;
+  scope: string;
+  type: string;
+  text: string;
+  factions: string[];
+}
+export interface AiLogEntry {
+  tick: number;
+  label: string;
+  mode: string;
+  why: string;
+  prompt?: string;
+  reply: string;
+  results: { line: string; ok: boolean; msg: string }[];
 }
 
 export interface StatsMsg {
@@ -38,6 +89,12 @@ export interface StatsMsg {
   counts: number[];
   /** 每座城各职业人数 */
   townCounts: number[][];
+  towns: TownStat[];
+  /** 全部势力（含新冒出来的起义军、已灭亡的），下标 = 单位帧里的势力字节 */
+  factions: FactionStat[];
+  relations: RelationStat[];
+  /** 上次推送以后新增的史册条目（上帝视角，含密信等私密条目） */
+  chronicle: ChronicleEntry[];
 }
 
 export interface InspectInfo {
@@ -65,11 +122,16 @@ export type ServerMsg =
   | { t: 'hello'; v: number; defs: Defs }
   | StatsMsg
   | { t: 'result'; id: number; ok: boolean; msg: string; warns?: string[]; hint?: string; queued?: boolean }
-  | { t: 'inspect'; id: number; info: InspectInfo | null };
+  | { t: 'inspect'; id: number; info: InspectInfo | null }
+  /** 握手后补发最近的史册 */
+  | { t: 'chronicle'; entries: ChronicleEntry[] }
+  | { t: 'ailog'; faction: string; personality: string; mode: string; logs: AiLogEntry[]; thoughts: { tick: number; text: string }[] };
 
 export type ClientMsg =
   | { t: 'view'; x0: number; y0: number; x1: number; y1: number }
   | { t: 'chunks'; list: [number, number][] }
   | { t: 'inspect'; id: number }
   /** as = 势力名（以诸侯身份，调试用）；null = 上帝 */
-  | { t: 'cmd'; id: number; line: string; as: string | null };
+  | { t: 'cmd'; id: number; line: string; as: string | null }
+  /** 要某个诸侯席位的 AI 决策记录和心里话 */
+  | { t: 'ailog'; faction: string };

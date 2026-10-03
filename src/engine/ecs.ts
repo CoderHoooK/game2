@@ -51,6 +51,14 @@ interface Store {
   cols: Record<string, ArrayLike<unknown> & { [i: number]: unknown }> & { has: Uint8Array };
 }
 
+export interface WorldSnapshot {
+  hw: number;
+  count: number;
+  free: number[];
+  alive: number[];
+  stores: Record<string, Record<string, unknown[]>>;
+}
+
 export class World {
   readonly capacity: number;
   readonly alive: Uint8Array;
@@ -132,6 +140,44 @@ export class World {
       out[s.def.id] = o;
     }
     return out;
+  }
+
+  /** 存档：所有组件的所有列（只存到 hw 为止）。obj 列原样放进数组（要求能 JSON 化）。 */
+  snapshot(): WorldSnapshot {
+    const stores: WorldSnapshot['stores'] = {};
+    for (const s of this.stores.values()) {
+      const cols: Record<string, unknown[]> = { has: Array.from(s.cols.has.subarray(0, this.hw)) };
+      for (const k of Object.keys(s.def.fields)) cols[k] = Array.prototype.slice.call(s.cols[k], 0, this.hw) as unknown[];
+      stores[s.def.id] = cols;
+    }
+    return { hw: this.hw, count: this.count, free: [...this.free], alive: Array.from(this.alive.subarray(0, this.hw)), stores };
+  }
+
+  /** 读档：覆盖当前所有组件数据（组件要先登记好；存档里多出来的组件忽略，少了的清零） */
+  restore(snap: WorldSnapshot): void {
+    if (snap.hw > this.capacity) throw new Error(`存档实体数 ${snap.hw} 超过容量 ${this.capacity}`);
+    this.alive.fill(0);
+    this.alive.set(snap.alive);
+    this.hw = snap.hw;
+    this.count = snap.count;
+    this.free = [...snap.free];
+    for (const s of this.stores.values()) {
+      const src = snap.stores[s.def.id];
+      s.cols.has.fill(0);
+      for (const k of Object.keys(s.def.fields)) {
+        const col = s.cols[k];
+        if (Array.isArray(col)) col.fill(null);
+        else (col as unknown as Float64Array).fill(0);
+      }
+      if (!src) continue;
+      s.cols.has.set(src.has as number[]);
+      for (const k of Object.keys(s.def.fields)) {
+        const data = src[k];
+        if (!data) continue;
+        const col = s.cols[k];
+        for (let i = 0; i < data.length; i++) col[i] = data[i];
+      }
+    }
   }
 
   /** 状态哈希（可重现测试用）：所有活实体的所有数值字段 */

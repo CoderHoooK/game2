@@ -62,3 +62,41 @@ export interface ResourceKindDef {
   regen: number;
   color: string;
 }
+
+export interface BuildingDef {
+  id: string;
+  name: string;
+  /** 建在城镇里还是地区里（伐木场这类建在资源地区） */
+  site: 'town' | 'region';
+  /** 材料（物品 ID → 数量），施工时由建筑工从仓库搬 */
+  cost: Record<string, number>;
+  /** 需要多少工时（人·秒） */
+  work: number;
+  /** 每座城 / 每个地区最多几座 */
+  max: number;
+  text: string;
+}
+
+export interface TreatyDef {
+  id: string;
+  name: string;
+  text: string;
+}
+
+export interface DisasterDef {
+  id: string;
+  name: string;
+  text: string;
+}
+
+export interface NotableDef {
+  name: string;
+  /** 所属势力；空 = 在野（可以被招揽） */
+  faction: string;
+  /** 出身职业 */
+  profession: string;
+  title: string;
+  traits: string[];
+  loyalty: number;
+  ambition: number;
+}

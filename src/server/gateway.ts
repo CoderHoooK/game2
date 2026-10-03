@@ -3,9 +3,11 @@ import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'node:http';
 import type { Sim } from '../engine/sim';
 import type { Source } from '../engine/commands/types';
-import type { WorldApi, EconomyApi, PopulationApi, JobsApi } from '../game';
+import type { WorldApi, EconomyApi, PopulationApi, JobsApi, MilitaryApi, ChronicleApi } from '../game';
+import type { AiHost } from '../ai';
+import { BUILDINGS } from '../../content/buildings';
 import { PROTOCOL_VERSION, type ClientMsg, type Defs, type ServerMsg, type StatsMsg } from '../protocol/messages';
-import { encodeChunk, encodeNodes, encodeTerrain } from '../protocol/codec';
+import { encodeChunk, encodeNodes, encodeTerrain, encodeTerritory } from '../protocol/codec';
 import { Interest, type View } from './interest';
 
 interface Client {
@@ -36,6 +38,7 @@ export function buildDefs(sim: Sim): Defs {
     regions: world.map.regions.filter((r) => r.land).map((r) => ({ id: r.id, name: r.name, x: r.cx, y: r.cy, terrain: r.terrain })),
     behaviors: sim.brains.behaviors.map(({ id, name }) => ({ id, name })),
     commands: sim.bus.list().map((c) => ({ verb: c.verb, signature: sim.bus.signature(c), help: c.help, examples: c.examples, who: c.who, module: c.module })),
+    buildings: BUILDINGS.map(({ id, name, text }) => ({ id, name, text })),
   };
 }
 
@@ -51,6 +54,7 @@ export class Gateway {
   constructor(
     private sim: Sim,
     server: Server,
+    private ai: AiHost | null = null,
   ) {
     this.world = sim.service<WorldApi>('world');
     this.defs = buildDefs(sim);
@@ -88,12 +92,21 @@ export class Gateway {
     return encodeNodes(w.map.size, n.count, n.x, n.y, n.kind, level);
   }
 
+  private terrVersion = -1;
+  private territoryBuf(): ArrayBuffer {
+    const t = this.sim.service<MilitaryApi>('military').territory();
+    this.terrVersion = t.version;
+    return encodeTerritory(t.version, t.size, t.data);
+  }
+
   private onConnect(ws: WebSocket): void {
     const c: Client = { ws, view: null, sent: 0 };
     this.clients.add(c);
     this.send(c, { t: 'hello', v: PROTOCOL_VERSION, defs: this.defs });
     this.send(c, this.terrainBuf);
     this.send(c, this.nodesBuf());
+    this.send(c, this.territoryBuf());
+    this.send(c, { t: 'chronicle', entries: this.sim.service<ChronicleApi>('chronicle').entries('god').slice(-300) });
     ws.on('close', () => this.clients.delete(c));
     ws.on('message', (data, isBinary) => {
       if (isBinary) return;
@@ -124,6 +137,13 @@ export class Gateway {
       case 'inspect': {
         const ok = this.sim.world.alive[m.id] === 1;
         this.send(c, { t: 'inspect', id: m.id, info: ok ? (this.sim.service<JobsApi>('jobs').describe(m.id) as never) : null });
+        break;
+      }
+      case 'ailog': {
+        const f = String(m.faction || '');
+        const seat = this.ai?.seats.get(f);
+        const thoughts = this.sim.service<ChronicleApi>('chronicle').thoughts(f).slice(-50).map(({ tick, text }) => ({ tick, text }));
+        this.send(c, { t: 'ailog', faction: f, personality: seat?.personality.name ?? '', mode: seat ? seat.mode : this.ai ? '已灭亡' : 'AI 关闭', logs: (seat?.log ?? []).slice(-20), thoughts });
         break;
       }
       case 'cmd': {
@@ -157,6 +177,10 @@ export class Gateway {
     }
     if (stepNo % 50 === 0) {
       const buf = this.nodesBuf();
+      for (const c of this.clients) this.send(c, buf);
+    }
+    if (stepNo % 10 === 5 && this.sim.service<MilitaryApi>('military').territory().version !== this.terrVersion) {
+      const buf = this.territoryBuf();
       for (const c of this.clients) this.send(c, buf);
     }
   }

@@ -55,7 +55,7 @@ export class Console {
     const role = this.role();
     const cmds = this.defs.commands.filter((c) => c.who.includes(role));
     this.list.innerHTML =
-      `<div class="dim small">${role === 'god' ? '上帝' : this.who.value} 现在能用的命令（第 0 阶段已实现的；其余见架构图谱）</div>` +
+      `<div class="dim small">${role === 'god' ? '上帝' : this.who.value} 现在能用的命令（点一下填进命令框）</div>` +
       cmds.map((c) => `<div class="cmd" data-line="${esc(c.examples[0])}"><code>${esc(c.signature)}</code><span>${esc(c.help)}</span><em>${esc(c.examples.join('　'))}</em></div>`).join('');
   }
   private toggleList(): void {
@@ -68,6 +68,20 @@ export class Console {
   }
 
   /** 以指定身份执行（速度按钮用上帝身份） */
+  private whoKey = '';
+  /** 活着的诸侯变了（起义、灭亡）：刷新身份下拉框 */
+  setFactions(names: string[]): void {
+    const key = names.join(',');
+    if (key === this.whoKey) return;
+    this.whoKey = key;
+    const cur = this.who.value;
+    this.who.innerHTML = `<option value="">☁ 上帝</option>` + names.map((n) => `<option value="${esc(n)}">${esc(n)}（以诸侯身份）</option>`).join('');
+    this.who.value = cur === '' || names.includes(cur) ? cur : names[0] ?? '';
+  }
+  setWho(name: string | null): void {
+    this.who.value = name ?? '';
+    this.renderList();
+  }
   submit(line: string, as: string | null = this.who.value || null): void {
     line = line.trim();
     if (!line) return;

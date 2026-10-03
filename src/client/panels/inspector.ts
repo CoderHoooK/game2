@@ -10,14 +10,14 @@ export class Inspector {
   townId = -1;
   constructor(
     private defs: Defs,
-    private on: { close(): void; fill(line: string): void; follow(on: boolean): void },
+    private on: { close(): void; fill(line: string, as?: string | null): void; follow(on: boolean): void },
   ) {
     this.el.addEventListener('click', (ev) => {
       const t = (ev.target as HTMLElement).closest<HTMLElement>('[data-act]');
       if (!t) return;
       const act = t.dataset.act;
       if (act === 'close') this.on.close();
-      if (act === 'fill') this.on.fill(t.dataset.line || '');
+      if (act === 'fill') this.on.fill(t.dataset.line || '', t.dataset.as === undefined ? undefined : t.dataset.as || null);
       if (act === 'follow') {
         this.follow = !this.follow;
         this.on.follow(this.follow);
@@ -82,26 +82,44 @@ export class Inspector {
   showTown(id: number, stats: StatsMsg | null): void {
     this.townId = id;
     const t = this.defs.towns[id];
-    const f = this.defs.factions[t.faction];
+    const ts = stats?.towns[id];
+    const fi = ts?.faction ?? t.faction;
+    const f = stats?.factions[fi] ?? this.defs.factions[fi];
+    const capital = ts?.capital ?? t.capital;
     const stock = stats?.stocks[id] || [];
     const counts = stats?.townCounts?.[id] || [];
     const total = counts.reduce((a, b) => a + b, 0);
+    const mood = ts?.mood ?? 60;
+    const moodColor = mood >= 60 ? '#4ade80' : mood >= 35 ? '#fbbf24' : '#f87171';
+    const bname = (k: string) => this.defs.buildings.find((b) => b.id === k)?.name ?? k;
+    const built = ts ? Object.entries(ts.buildings).filter(([, n]) => n > 0) : [];
+    const siege = ts?.siege ? `<div class="alert">⚔ 被 <b style="color:${stats!.factions[ts.siege.by].color}">${esc(stats!.factions[ts.siege.by].name)}</b> 围城中 · ${Math.round(ts.siege.progress * 100)}%</div>` : '';
     this.el.innerHTML = `
       <div class="ins-head">
-        <div class="avatar" style="--c:${f.color}"><b style="color:${f.color}">${t.capital ? '都' : '镇'}</b></div>
-        <div><div class="ins-name">${esc(t.name)}</div><div class="dim"><span class="fdot" style="background:${f.color}"></span>${esc(f.name)} · ${t.capital ? '都城' : '城镇'} · ${total} 人</div></div>
+        <div class="avatar" style="--c:${f.color}"><b style="color:${f.color}">${capital ? '都' : '镇'}</b></div>
+        <div><div class="ins-name">${esc(t.name)}</div><div class="dim"><span class="fdot" style="background:${f.color}"></span>${esc(f.name)} · ${capital ? '都城' : '城镇'} · ${total} 人${ts ? ` / 上限 ${ts.cap}` : ''}</div></div>
         <span class="spacer"></span><button class="x" data-act="close">×</button>
       </div>
+      ${siege}
+      <div class="bar" title="民心 0–100：吃饱、低税、开仓会升；断粮、高税会降。太低会有人逃走，长期很低会起义"><i style="width:${mood}%;background:${moodColor}"></i><span>民心 ${mood}</span></div>
+      <div class="dim small">税 ${ts?.tax ?? 10}% · 城墙 ${ts?.walls ?? 0} 层</div>
       <div class="sec">仓库</div>
-      <div class="stats">${this.defs.items.slice(0, 5).map((it, k) => `<div><b style="color:${it.color}">${fmt(stock[k] || 0)}</b><span>${esc(it.name)}</span></div>`).join('')}</div>
+      <div class="stats">${this.defs.items.slice(0, 6).map((it, k) => `<div><b style="color:${it.color}">${fmt(stock[k] || 0)}</b><span>${esc(it.name)}</span></div>`).join('')}</div>
+      <div class="sec">建筑</div>
+      <div>${built.length ? built.map(([k, n]) => `<span class="chip">${esc(bname(k))}${n > 1 ? ' ×' + n : ''}</span>`).join('') : '<span class="dim small">还没有</span>'}</div>
+      ${ts?.sites.length ? `<div class="sec">工地</div>${ts.sites.map((s) => `<div class="bar thin"><i style="width:${Math.round(s.progress * 100)}%"></i><span>${esc(s.name)} ${Math.round(s.progress * 100)}%</span></div>`).join('')}` : ''}
       <div class="sec">人口</div>
       <div class="plist">${this.defs.professions.map((p, k) => `<div>${shapeSvg(p.shape, p.color, 12)}<span>${esc(p.name)}</span><b>${counts[k] || 0}</b></div>`).join('')}</div>
-      <div class="sec">试试</div>
+      <div class="sec">试试（以 ${esc(f.name)} 的身份）</div>
       <div class="cmds">
-        <div class="cmd" data-act="fill" data-line="派 @木@${esc(t.name)}:5 伐木"><code>派 @木@${esc(t.name)}:5 伐木</code><span>派 5 个本城伐木工去伐木（锁定）</span></div>
-        <div class="cmd" data-act="fill" data-line="编 @兵@${esc(t.name)}:10 卫队"><code>编 @兵@${esc(t.name)}:10 卫队</code><span>编一支 10 人的卫队</span></div>
+        <div class="cmd" data-act="fill" data-as="${esc(f.name)}" data-line="建 房屋 ${esc(t.name)}"><code>建 房屋 ${esc(t.name)}</code><span>盖房子（木 40），人口上限 +30</span></div>
+        <div class="cmd" data-act="fill" data-as="${esc(f.name)}" data-line="税 ${esc(t.name)} 5"><code>税 ${esc(t.name)} 5</code><span>减税，民心慢慢回升</span></div>
+        <div class="cmd" data-act="fill" data-as="${esc(f.name)}" data-line="开仓 ${esc(t.name)} 200"><code>开仓 ${esc(t.name)} 200</code><span>开仓放粮，民心马上回升</span></div>
+        <div class="cmd" data-act="fill" data-as="${esc(f.name)}" data-line="比例 ${esc(t.name)} 农40 木15 石8 矿5 建8 铁3 运5 兵10 斥3 商3"><code>比例 ${esc(t.name)} 农40 …</code><span>调职业比例，每天自动转职</span></div>
       </div>
-      <div class="dim small" style="margin-top:8px">以 <b>${esc(f.name)}</b> 的身份下命令：命令框左边选「${esc(f.name)}」。</div>`;
+      <div class="cmds" style="margin-top:6px">
+        <div class="cmd" data-act="fill" data-as="" data-line="灾 疫 ${esc(t.name)} 5天"><code>灾 疫 ${esc(t.name)} 5天</code><span>（上帝）降瘟疫</span></div>
+      </div>`;
     this.el.hidden = false;
   }
 }

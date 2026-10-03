@@ -3,20 +3,29 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>诸侯争霸 · 第 0 阶段</title>
+    <title>诸侯争霸</title>
   </head>
   <body>
     <div id="stage"></div>
     <header id="topbar">
-      <div class="brand"><span class="logo">诸</span><div><b>诸侯争霸</b><small>第 0 阶段 · 地基</small></div></div>
+      <div class="brand"><span class="logo">诸</span><div><b>诸侯争霸</b><small>你是上帝 · 看诸侯勾心斗角</small></div></div>
       <div id="clock" class="clock">—</div>
       <div id="speed" class="seg"></div>
+      <div id="news" class="news" title="最近一条天下大事（J 打开史册）"></div>
       <div class="spacer"></div>
       <div id="perf" class="perf"></div>
+      <div class="seg">
+        <button data-drawer="chronicle" title="史册（J）">📜 史册</button>
+        <button data-drawer="lords" title="诸侯关系">⚔ 诸侯</button>
+        <button data-drawer="minds" title="AI 诸侯的心里话">💭 心里话</button>
+        <button data-drawer="god" title="上帝命令">☁ 上帝</button>
+        <button id="terrBtn" title="领土（T）">▦ 领土</button>
+      </div>
       <a class="btn ghost" href="./atlas/" target="_blank" rel="noopener">架构图谱 ↗</a>
     </header>
     <aside id="legend" class="panel"></aside>
     <aside id="inspector" class="panel" hidden></aside>
+    <aside id="drawer" class="panel" hidden></aside>
     <section id="console" class="panel">
       <div id="log"></div>
       <form id="cmdForm">
@@ -28,7 +37,7 @@
       <div id="cmdList" hidden></div>
     </section>
     <div id="minimapBox" class="panel"><canvas id="minimap" width="200" height="200"></canvas></div>
-    <div id="hint">拖动平移 · 滚轮缩放 · 点小人 / 城镇看详情 · <kbd>Home</kbd> 全图 · <kbd>F</kbd> 跟随</div>
+    <div id="hint">拖动平移 · 滚轮缩放 · 点小人 / 城镇看详情 · <kbd>Home</kbd> 全图 · <kbd>F</kbd> 跟随 · <kbd>T</kbd> 领土 · <kbd>J</kbd> 史册</div>
     <div id="toast"></div>
     <div id="loading"><div class="spin"></div><span>正在连接世界…</span></div>
     <script type="module" src="./main.ts"></script>

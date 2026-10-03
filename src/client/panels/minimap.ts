@@ -7,26 +7,16 @@ export class Minimap {
   private c = $<HTMLCanvasElement>('#minimap');
   private g = this.c.getContext('2d')!;
   private base: HTMLCanvasElement;
+  private key = '';
   constructor(
     private defs: Defs,
-    overview: HTMLCanvasElement,
+    private overview: HTMLCanvasElement,
     private cam: Camera,
   ) {
     const S = this.c.width;
     this.base = document.createElement('canvas');
     this.base.width = this.base.height = S;
-    const b = this.base.getContext('2d')!;
-    b.imageSmoothingEnabled = true;
-    b.drawImage(overview, 0, 0, S, S);
-    for (const t of defs.towns) {
-      b.fillStyle = defs.factions[t.faction].color;
-      b.strokeStyle = '#000';
-      const s = t.capital ? 6 : 4;
-      const x = (t.x / defs.size) * S;
-      const y = (t.y / defs.size) * S;
-      b.fillRect(x - s / 2, y - s / 2, s, s);
-      b.strokeRect(x - s / 2, y - s / 2, s, s);
-    }
+    this.paint(defs.towns.map((t) => defs.factions[t.faction].color), null);
     let drag = false;
     const go = (ev: PointerEvent) => {
       const r = this.c.getBoundingClientRect();
@@ -35,6 +25,27 @@ export class Minimap {
     this.c.addEventListener('pointerdown', (ev) => ((drag = true), this.c.setPointerCapture(ev.pointerId), go(ev)));
     this.c.addEventListener('pointermove', (ev) => drag && go(ev));
     this.c.addEventListener('pointerup', () => (drag = false));
+  }
+
+  /** 城镇颜色 + 领土（可选的画布，已经画好半透明色块） */
+  paint(colors: string[], territory: HTMLCanvasElement | null, key = ''): void {
+    if (key && key === this.key) return;
+    this.key = key;
+    const S = this.c.width;
+    const defs = this.defs;
+    const b = this.base.getContext('2d')!;
+    b.imageSmoothingEnabled = true;
+    b.drawImage(this.overview, 0, 0, S, S);
+    if (territory) b.drawImage(territory, 0, 0, S, S);
+    for (const t of defs.towns) {
+      b.fillStyle = colors[t.id];
+      b.strokeStyle = '#000';
+      const s = t.capital ? 6 : 4;
+      const x = (t.x / defs.size) * S;
+      const y = (t.y / defs.size) * S;
+      b.fillRect(x - s / 2, y - s / 2, s, s);
+      b.strokeRect(x - s / 2, y - s / 2, s, s);
+    }
   }
   draw(): void {
     const S = this.c.width;

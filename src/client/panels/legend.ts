@@ -28,9 +28,26 @@ export class Legend {
       <div class="sec">职业 <span class="dim">（点一下高亮）</span></div>
       <div class="plist">${d.professions.map((p, k) => `<div data-prof="${k}" class="${this.highlight === k ? 'on' : ''}">${shapeSvg(p.shape, p.color, 13)}<span>${esc(p.name)}</span><b>${s?.counts[k] ?? ''}</b></div>`).join('')}</div>
       <div class="sec">诸侯</div>
-      <div class="flist">${d.factions.map((f, i) => `<div><span class="fdot" style="background:${f.color}"></span><b>${esc(f.name)}</b>${d.towns.filter((t) => t.faction === i).map((t) => `<a data-town="${t.id}">${esc(t.name)}</a>`).join('')}</div>`).join('')}</div>`;
+      <div class="flist">${this.factionList(s)}</div>`;
+  }
+  private fkey = '';
+  private factionList(s: StatsMsg | null): string {
+    const d = this.defs;
+    const fs = s?.factions ?? d.factions.map((f) => ({ ...f, kind: 'lord', alive: true }));
+    const tf = s?.towns.map((t) => t.faction) ?? d.towns.map((t) => t.faction);
+    this.fkey = fs.map((f) => f.name + f.alive).join(',') + tf.join(',');
+    return fs
+      .map((f, i) => ({ f, i }))
+      .filter(({ f }) => f.kind === 'lord' || f.kind === 'rebel')
+      .map(({ f, i }) => {
+        const towns = d.towns.filter((t) => tf[t.id] === i);
+        return `<div class="${f.alive ? '' : 'dead'}"><span class="fdot" style="background:${f.color}"></span><b>${esc(f.name)}</b>${f.alive ? towns.map((t) => `<a data-town="${t.id}">${esc(t.name)}</a>`).join('') : '<span class="dim small">已覆灭</span>'}</div>`;
+      })
+      .join('');
   }
   counts(s: StatsMsg): void {
+    const key = s.factions.map((f) => f.name + f.alive).join(',') + s.towns.map((t) => t.faction).join(',');
+    if (key !== this.fkey) this.el.querySelector('.flist')!.innerHTML = this.factionList(s);
     this.el.querySelectorAll<HTMLElement>('[data-prof]').forEach((x) => {
       const b = x.querySelector('b');
       if (b) b.textContent = String(s.counts[Number(x.dataset.prof)] ?? '');
