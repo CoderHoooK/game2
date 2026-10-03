@@ -94,6 +94,7 @@
     item: { name: '物品', parse: (t, ix) => (ix.w.items.includes(t) ? ok(t) : bad(`没有物品"${t}"`, '可选：' + ix.w.items.join('、'))) },
     building: { name: '建筑', parse: (t, ix) => (ix.w.buildings.includes(t) ? ok(t) : bad(`没有建筑"${t}"`, '可选：' + ix.w.buildings.join('、'))) },
     group: { name: '队名', parse: (t) => { const n = t.replace(/^#/, ''); return n ? ok(n, '#' + n) : bad('缺少队名'); } },
+    anyFaction: { name: '任意势力', parse: (t, ix) => (ix.w.factions.includes(t) ? ok(t) : bad(`没有势力"${t}"`, '示例势力：' + ix.w.factions.join('、'))) },
     faction: { name: '势力', parse: (t, ix) => (t === ix.w.me ? bad('不能对自己') : ix.w.factions.includes(t) ? ok(t) : bad(`没有势力"${t}"`, '示例势力：' + ix.w.factions.filter((f) => f !== ix.w.me).join('、'))) },
     notable: { name: '名人', parse: (t, ix) => (ix.w.notables.includes(t) ? ok(t) : bad(`不认识名人"${t}"`, '示例：' + ix.w.notables.join('、'))) },
     int: { name: '整数', parse: (t) => (/^\d+$/.test(t) ? ok(parseInt(t, 10)) : bad(`"${t}"不是整数`)) },
@@ -181,7 +182,7 @@
     const myWork = Object.keys(w.works).find((k) => w.works[k] === prof.id);
     const sel = `@${prof.short}:5`;
     const fill = { town: '青石城', place: '北林', target: '赤焰.落霞镇', item: '木头', prof: prof.id === 'soldier' ? '农' : '兵',
-      group: prof.short + '队', faction: '白鹿', building: '兵营', int: '10', duration: '30天' };
+      group: prof.short + '队', faction: '白鹿', anyFaction: '白鹿', building: '兵营', int: '10', duration: '30天' };
     const out = [];
     for (const c of atlas.commands) {
       if (!c.who.includes('lord')) continue;

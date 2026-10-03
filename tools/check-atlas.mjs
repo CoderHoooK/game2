@@ -134,7 +134,7 @@ for (const s of A.selectors) {
 const can = (prof, order) => P.professionOrders(A.professions.find((p) => p.id === prof), A).some((o) => o.id === order);
 for (const [prof, order, want] of [
   ['soldier', 'attack', true], ['soldier', 'guard', true], ['soldier', 'scout', false], ['soldier', 'work', false],
-  ['scout', 'scout', true], ['scout', 'attack', false],
+  ['scout', 'scout', true], ['scout', 'attack', true] /* 行军行为也负责进攻途中的行军，斥候可以跟着攻 */,
   ['builder', 'build', true], ['merchant', 'build', false], ['smith', 'build', false], ['porter', 'haul', true],
   ['woodcutter', 'work', true], ['porter', 'work', false], ['woodcutter', 'attack', false], ['merchant', 'trade', true],
 ]) check(can(prof, order) === want, `能力事实不符：${prof} ${want ? '应能' : '不应能'}接 ${order}`);

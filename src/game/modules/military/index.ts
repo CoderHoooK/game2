@@ -180,24 +180,40 @@ export const military: GameModule = {
     const threatAt = new Int32Array(W.capacity).fill(-1);
     const hostileF = new Uint8Array(32 * 32);
     const factionHostile = new Uint8Array(32);
+    /** 每个势力的敌对势力位掩码（势力 ≤ 32 个） */
+    const hostMask = new Uint32Array(32);
     const refreshHostility = () => {
       hostileF.fill(0);
       factionHostile.fill(0);
+      hostMask.fill(0);
       for (let a = 0; a < F.length; a++)
         for (let b = 0; b < F.length; b++)
           if (F[a].alive && F[b].alive && dip.hostile(a, b)) {
             hostileF[a * 32 + b] = 1;
             factionHostile[a] = 1;
+            hostMask[a] |= 1 << b;
           }
+    };
+    /** 每格里有哪些势力的人（位掩码）：周围 3×3 格没有敌人就不用逐个找 */
+    const cellMask = new Uint32Array(GW * GW);
+    const nearMask = (x: number, y: number) => {
+      const cx = Math.floor(x / CELL);
+      const cy = Math.floor(y / CELL);
+      let m = 0;
+      for (let gy = Math.max(0, cy - 1); gy <= Math.min(GW - 1, cy + 1); gy++)
+        for (let gx = Math.max(0, cx - 1); gx <= Math.min(GW - 1, cx + 1); gx++) m |= cellMask[gy * GW + gx];
+      return m;
     };
     const cellOf = (x: number, y: number) => Math.min(GW - 1, Math.max(0, Math.floor(y / CELL))) * GW + Math.min(GW - 1, Math.max(0, Math.floor(x / CELL)));
     const buildGrid = () => {
       head.fill(-1);
+      cellMask.fill(0);
       if (next.length < W.capacity) next = new Int32Array(W.capacity);
       for (const e of pop.npcs()) {
         const c = cellOf(P.x[e], P.y[e]);
         next[e] = head[c];
         head[c] = e;
+        cellMask[c] |= 1 << I.faction[e];
       }
     };
     /** 在 (x,y) 附近 r 米内找：满足 pred 的最近的人 */
@@ -242,11 +258,19 @@ export const military: GameModule = {
             if (canFight[PR.prof[e]]) {
               const cur = enemy[e];
               if (cur >= 0 && W.alive[cur] && I.has[cur] && hostileF[fe * 32 + I.faction[cur]] && (P.x[cur] - P.x[e]) ** 2 + (P.y[cur] - P.y[e]) ** 2 < (AGGRO * 1.8) ** 2) continue;
+              if (!(nearMask(P.x[e], P.y[e]) & hostMask[fe])) {
+                enemy[e] = -1;
+                continue;
+              }
               let t = nearest(P.x[e], P.y[e], AGGRO, (o) => hostileF[fe * 32 + I.faction[o]] === 1 && isMil[PR.prof[o]]);
               if (t < 0) t = nearest(P.x[e], P.y[e], AGGRO, (o) => hostileF[fe * 32 + I.faction[o]] === 1);
               enemy[e] = t;
               if (t >= 0 && B.beh[e] !== fight) sim.brains.interrupt(e);
             } else {
+              if (!(nearMask(P.x[e], P.y[e]) & hostMask[fe])) {
+                threatAt[e] = -1;
+                continue;
+              }
               const t = nearest(P.x[e], P.y[e], WORKER_ALERT, (o) => hostileF[fe * 32 + I.faction[o]] === 1 && canFight[PR.prof[o]]);
               threatAt[e] = t >= 0 ? sim.clock.tick : -1;
               if (t >= 0) {
