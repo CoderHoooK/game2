@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>诸侯争霸 · 架构图谱</title>
+<link rel="stylesheet" href="atlas.css">
+</head>
+<body>
+<div id="app">
+  <aside id="nav"></aside>
+  <main id="main">
+    <header id="topbar">
+      <div class="crumb" id="crumb"></div>
+      <button class="search-btn" id="searchBtn" type="button">🔍 搜索模块、职业、命令… <span class="kbd">Ctrl K</span></button>
+    </header>
+    <div id="view"></div>
+  </main>
+</div>
+<div id="scrim"></div>
+<aside id="drawer" aria-hidden="true"></aside>
+<div id="palette"><div class="pal"><input id="palInput" placeholder="输入关键字：伐木、攻、jobs、Carry…" autocomplete="off"><div class="pal-list" id="palList"></div></div></div>
+<div id="toast"></div>
+<script src="data.js"></script>
+<script src="parser.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

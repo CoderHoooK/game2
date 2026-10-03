@@ -1,0 +1,12 @@
+{
+  "name": "game2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "atlas": "node tools/check-atlas.mjs && node tools/build-atlas.mjs",
+    "atlas:check": "node tools/check-atlas.mjs",
+    "atlas:serve": "node tools/serve-atlas.mjs",
+    "atlas:smoke": "node tools/atlas-smoke.mjs",
+    "test": "node tools/check-atlas.mjs"
+  }
+}

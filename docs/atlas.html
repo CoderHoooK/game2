@@ -1,0 +1,1662 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>诸侯争霸 · 架构图谱</title>
+<style>
+/* 架构图谱样式：深色、玻璃卡片、无外部资源（字体用系统字体） */
+:root {
+  --bg: #070b17;
+  --bg2: #0c1224;
+  --panel: rgba(255, 255, 255, 0.035);
+  --panel2: rgba(255, 255, 255, 0.06);
+  --line: rgba(255, 255, 255, 0.08);
+  --line2: rgba(255, 255, 255, 0.14);
+  --text: #e6e9f2;
+  --muted: #8a93ab;
+  --dim: #5d6680;
+  --accent: #7c5cff;
+  --accent2: #22d3ee;
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --radius: 14px;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.6 var(--sans); }
+body {
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(124, 92, 255, 0.16), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(34, 211, 238, 0.10), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+a { color: inherit; text-decoration: none; }
+code, .mono { font-family: var(--mono); font-size: 0.92em; }
+::selection { background: rgba(124, 92, 255, 0.45); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+
+/* ------------------------------------------------------------ 布局 */
+#app { display: grid; grid-template-columns: 248px 1fr; height: 100vh; }
+#nav {
+  border-right: 1px solid var(--line); background: rgba(7, 11, 23, 0.72); backdrop-filter: blur(12px);
+  display: flex; flex-direction: column; padding: 20px 14px; overflow-y: auto;
+}
+.brand { display: flex; gap: 12px; align-items: center; padding: 4px 8px 18px; }
+.brand-logo {
+  width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; font-weight: 800; font-size: 18px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 6px 24px rgba(124, 92, 255, 0.45);
+}
+.brand-title { font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }
+.brand-sub { font-size: 11px; color: var(--muted); }
+.nav-group { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 1.5px; padding: 14px 10px 6px; }
+.nav-link {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; color: var(--muted);
+  cursor: pointer; transition: background .15s, color .15s; font-size: 13.5px;
+}
+.nav-link:hover { background: var(--panel2); color: var(--text); }
+.nav-link.active { background: linear-gradient(90deg, rgba(124, 92, 255, 0.22), rgba(124, 92, 255, 0.04)); color: #fff; box-shadow: inset 2px 0 0 var(--accent); }
+.nav-link .ico { width: 20px; text-align: center; }
+.nav-link .cnt { margin-left: auto; font-size: 11px; color: var(--dim); font-family: var(--mono); }
+.nav-foot { margin-top: auto; padding: 16px 10px 0; font-size: 11px; color: var(--dim); line-height: 1.7; border-top: 1px solid var(--line); }
+
+#main { overflow-y: auto; position: relative; }
+#topbar {
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 14px; padding: 14px 32px;
+  background: rgba(7, 11, 23, 0.7); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line);
+}
+.crumb { color: var(--muted); font-size: 13px; }
+.crumb b { color: var(--text); font-weight: 600; }
+.search-btn {
+  margin-left: auto; display: flex; align-items: center; gap: 10px; padding: 7px 12px; min-width: 260px;
+  border: 1px solid var(--line2); border-radius: 10px; background: var(--panel); color: var(--muted); cursor: pointer; font: inherit;
+}
+.search-btn:hover { border-color: rgba(124, 92, 255, 0.6); color: var(--text); }
+.kbd { margin-left: auto; font-family: var(--mono); font-size: 11px; padding: 1px 6px; border: 1px solid var(--line2); border-radius: 6px; color: var(--dim); }
+#view { padding: 28px 32px 80px; max-width: 1280px; animation: fade .25s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ------------------------------------------------------------ 通用 */
+h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: 0.5px; }
+h2 { font-size: 18px; margin: 34px 0 14px; display: flex; align-items: center; gap: 10px; }
+h2 .sub { font-size: 12px; color: var(--muted); font-weight: 400; }
+h3 { font-size: 14px; margin: 22px 0 10px; color: var(--muted); font-weight: 600; letter-spacing: 0.5px; }
+.lead { color: var(--muted); margin: 0 0 8px; max-width: 820px; }
+.grid { display: grid; gap: 14px; }
+.g2 { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.g4 { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px;
+  transition: border-color .15s, transform .15s, background .15s; position: relative;
+}
+.card.click { cursor: pointer; }
+.card.click:hover { border-color: rgba(124, 92, 255, 0.55); background: var(--panel2); transform: translateY(-2px); }
+.card-title { font-weight: 650; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.card-text { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 12px;
+  border: 1px solid var(--line2); background: rgba(255, 255, 255, 0.03); color: var(--text); margin: 2px 4px 2px 0; white-space: nowrap;
+}
+.chip.link { cursor: pointer; }
+.chip.link:hover { border-color: var(--accent); background: rgba(124, 92, 255, 0.15); }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; }
+.chip.mono { font-family: var(--mono); }
+.badge { font-size: 11px; padding: 1px 8px; border-radius: 999px; font-weight: 600; letter-spacing: 0.3px; white-space: nowrap; }
+.st-draft { background: rgba(148, 163, 184, 0.14); color: #b6c0d4; border: 1px solid rgba(148, 163, 184, 0.25); }
+.st-wip { background: rgba(251, 191, 36, 0.14); color: #fcd34d; border: 1px solid rgba(251, 191, 36, 0.3); }
+.st-done { background: rgba(52, 211, 153, 0.14); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.3); }
+.st-open { background: rgba(124, 92, 255, 0.16); color: #c4b5fd; border: 1px solid rgba(124, 92, 255, 0.35); }
+.st-decided { background: rgba(52, 211, 153, 0.14); color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.3); }
+.muted { color: var(--muted); }
+.dim { color: var(--dim); }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.spacer { flex: 1; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line2); background: var(--panel2); color: var(--text);
+  padding: 5px 11px; border-radius: 9px; font: inherit; font-size: 12.5px; cursor: pointer; transition: all .15s;
+}
+.btn:hover { border-color: var(--accent); background: rgba(124, 92, 255, 0.18); }
+.btn.primary { background: linear-gradient(135deg, var(--accent), #5b8cff); border-color: transparent; }
+.btn.sm { padding: 2px 8px; font-size: 11.5px; }
+table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.t th { text-align: left; color: var(--dim); font-weight: 600; font-size: 11.5px; letter-spacing: 0.8px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+table.t td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.t tr:last-child td { border-bottom: none; }
+table.t tr.click { cursor: pointer; }
+table.t tr.click:hover td { background: rgba(255, 255, 255, 0.025); }
+pre.code {
+  background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto;
+  font: 12.5px/1.65 var(--mono); color: #cbd5e1; margin: 0;
+}
+.k { color: #c4b5fd; } .s { color: #86efac; } .n { color: #fcd34d; } .c { color: #64748b; } .f { color: #67e8f9; }
+.cmdline {
+  font-family: var(--mono); background: rgba(0, 0, 0, 0.3); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px;
+  display: inline-flex; align-items: center; gap: 8px; font-size: 13px;
+}
+.cmdline .v { color: #fcd34d; font-weight: 700; }
+.cmdline .sel { color: #67e8f9; }
+
+/* ------------------------------------------------------------ 总览 */
+.hero {
+  position: relative; overflow: hidden; border-radius: 20px; padding: 34px 34px 30px; border: 1px solid var(--line2);
+  background:
+    radial-gradient(600px 260px at 100% 0%, rgba(124, 92, 255, 0.35), transparent 70%),
+    radial-gradient(500px 240px at 0% 100%, rgba(34, 211, 238, 0.18), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+}
+.hero h1 { font-size: 34px; background: linear-gradient(90deg, #fff, #c4b5fd 60%, #67e8f9); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero .lead { font-size: 15px; }
+.hero-units { position: absolute; right: 26px; top: 22px; width: 300px; height: 150px; opacity: 0.9; }
+.stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-top: 24px; }
+.stat { background: rgba(0, 0, 0, 0.25); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: all .15s; }
+.stat:hover { border-color: var(--accent); transform: translateY(-2px); }
+.stat b { display: block; font-size: 26px; font-family: var(--mono); background: linear-gradient(90deg, #fff, #a5b4fc); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.stat span { font-size: 12px; color: var(--muted); }
+.pr-ico { font-size: 22px; }
+
+/* ------------------------------------------------------------ 分层 */
+.stack { display: grid; grid-template-columns: 1fr 210px; gap: 14px; }
+.stack-main { display: flex; flex-direction: column; gap: 8px; }
+.layer {
+  border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; cursor: pointer; position: relative; overflow: hidden;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--lc) 16%, transparent), rgba(255, 255, 255, 0.015) 70%);
+  transition: all .18s;
+}
+.layer::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--lc); }
+.layer:hover, .layer.hl { border-color: var(--lc); transform: translateX(3px); box-shadow: 0 0 0 1px var(--lc), 0 8px 30px color-mix(in srgb, var(--lc) 25%, transparent); }
+.layer.dimmed { opacity: 0.35; }
+.layer-head { display: flex; align-items: baseline; gap: 10px; }
+.layer-name { font-weight: 700; font-size: 15px; }
+.layer-en { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.layer-role { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.layer.band { padding: 6px 18px; border-style: dashed; text-align: center; }
+.layer.band .layer-role { display: none; }
+.layer .mods { margin-top: 8px; }
+.stack-side { display: flex; flex-direction: column; gap: 8px; }
+.rule { border: 1px dashed var(--line2); border-radius: 12px; padding: 12px 14px; color: var(--muted); font-size: 12.5px; }
+
+/* ------------------------------------------------------------ 模块图 */
+.graph-wrap { background: rgba(0, 0, 0, 0.2); border: 1px solid var(--line); border-radius: 16px; padding: 10px; overflow-x: auto; }
+svg.graph { display: block; }
+svg.graph .edge { fill: none; stroke: rgba(148, 163, 184, 0.28); stroke-width: 1.6; transition: stroke .15s, opacity .15s; }
+svg.graph .edge.hl { stroke: #a78bfa; stroke-width: 2.4; }
+svg.graph .edge.dim { opacity: 0.12; }
+svg.graph .node { cursor: pointer; }
+svg.graph .node rect { fill: rgba(15, 22, 42, 0.95); stroke: rgba(255, 255, 255, 0.14); transition: all .15s; }
+svg.graph .node:hover rect, svg.graph .node.hl rect { stroke: #a78bfa; fill: rgba(40, 30, 80, 0.95); }
+svg.graph .node.dim { opacity: 0.3; }
+svg.graph text { fill: var(--text); font: 13px var(--sans); }
+svg.graph text.sm { fill: var(--muted); font-size: 11px; }
+.contrib { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* ------------------------------------------------------------ NPC / 职业 */
+.prof-card { overflow: hidden; }
+.prof-card::after { content: ""; position: absolute; inset: auto -40px -60px auto; width: 140px; height: 140px; border-radius: 50%; background: var(--pc); opacity: 0.08; filter: blur(4px); }
+.avatar {
+  width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; font-size: 22px; font-weight: 800; color: #0b1020;
+  background: linear-gradient(135deg, var(--pc), color-mix(in srgb, var(--pc) 55%, #fff)); box-shadow: 0 6px 22px color-mix(in srgb, var(--pc) 40%, transparent); flex: none;
+}
+.avatar.lg { width: 64px; height: 64px; font-size: 30px; border-radius: 18px; }
+.bars { display: grid; grid-template-columns: 40px 1fr 34px; gap: 5px 8px; align-items: center; font-size: 11.5px; margin-top: 12px; }
+.bar { height: 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--pc, var(--accent)), color-mix(in srgb, var(--pc, var(--accent)) 50%, #fff)); }
+.bars .v { text-align: right; font-family: var(--mono); color: var(--muted); }
+.comp-card .fields { margin-top: 8px; font-size: 12px; }
+.comp-card .fields div { display: grid; grid-template-columns: 74px 64px 1fr; gap: 6px; padding: 3px 0; border-top: 1px dashed var(--line); }
+.comp-card .fields code { color: #c4b5fd; }
+.comp-card .fields .ty { color: var(--dim); font-family: var(--mono); font-size: 11px; }
+
+/* 命令 → 行为 → 动作 流程 */
+.flow { display: grid; grid-template-columns: 1fr 34px 1fr 34px 1.3fr 34px 1fr; align-items: stretch; gap: 0; }
+.flow .step { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.flow .step h4 { margin: 0 0 4px; font-size: 13px; }
+.flow .step .muted { font-size: 12px; }
+.flow .arrow { display: grid; place-items: center; color: var(--dim); font-size: 18px; }
+.loop { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.loop span { padding: 4px 10px; border-radius: 8px; font-size: 12px; border: 1px solid var(--line2); background: rgba(255, 255, 255, 0.03); transition: all .25s; }
+.loop span.on { background: color-mix(in srgb, var(--pc, var(--accent)) 30%, transparent); border-color: var(--pc, var(--accent)); color: #fff; box-shadow: 0 0 18px color-mix(in srgb, var(--pc, var(--accent)) 40%, transparent); }
+
+/* 矩阵 */
+.matrix { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.matrix table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.matrix th, .matrix td { padding: 9px 10px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); text-align: center; white-space: nowrap; }
+.matrix th { color: var(--muted); font-weight: 600; background: rgba(0, 0, 0, 0.2); cursor: pointer; }
+.matrix th:hover { color: #fff; }
+.matrix td.yes { background: color-mix(in srgb, var(--pc) 13%, transparent); }
+.matrix td.yes span { cursor: pointer; }
+.matrix td.no { color: var(--dim); }
+.matrix td.rowh { text-align: left; cursor: pointer; }
+.matrix tr:hover td { background-color: rgba(255, 255, 255, 0.02); }
+
+/* ------------------------------------------------------------ 命令 */
+.playground { border: 1px solid rgba(124, 92, 255, 0.35); border-radius: 18px; padding: 18px; background: linear-gradient(180deg, rgba(124, 92, 255, 0.10), rgba(124, 92, 255, 0.02)); }
+.pg-input { display: flex; gap: 10px; align-items: center; }
+.pg-input input {
+  flex: 1; background: rgba(0, 0, 0, 0.45); border: 1px solid var(--line2); border-radius: 12px; color: #fff; padding: 12px 14px;
+  font: 16px var(--mono); outline: none; transition: border-color .15s, box-shadow .15s;
+}
+.pg-input input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.25); }
+.seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 10px; overflow: hidden; }
+.seg button { background: transparent; border: none; color: var(--muted); padding: 8px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.seg button.on { background: rgba(124, 92, 255, 0.3); color: #fff; }
+.pg-sig { margin-top: 10px; font-family: var(--mono); font-size: 12.5px; color: var(--muted); min-height: 20px; }
+.pg-out { margin-top: 12px; display: grid; gap: 8px; }
+.pg-ok, .pg-err { border-radius: 12px; padding: 12px 14px; font-size: 13px; }
+.pg-ok { border: 1px solid rgba(52, 211, 153, 0.35); background: rgba(52, 211, 153, 0.07); }
+.pg-err { border: 1px solid rgba(248, 113, 113, 0.4); background: rgba(248, 113, 113, 0.08); }
+.pg-arg { display: grid; grid-template-columns: 90px 90px 1fr; gap: 8px; padding: 5px 0; border-top: 1px dashed var(--line); font-size: 13px; }
+.pg-arg:first-of-type { border-top: none; }
+.pg-arg .ty { color: var(--dim); font-size: 12px; }
+.pg-ex { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+.cmd-row td:first-child { width: 84px; }
+.verb { font-weight: 800; font-size: 17px; color: #fcd34d; }
+.filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0 12px; }
+.filters input { background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line2); border-radius: 9px; color: var(--text); padding: 6px 10px; font: inherit; outline: none; min-width: 220px; }
+.filters input:focus { border-color: var(--accent); }
+
+/* 节拍 */
+.pipe { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.pipe .ph { flex: 1 1 150px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; position: relative; }
+.pipe .ph b { font-family: var(--mono); font-size: 12.5px; color: #a5b4fc; }
+.pipe .ph .muted { font-size: 12px; }
+.pipe .ph .no { position: absolute; right: 10px; top: 8px; font-family: var(--mono); font-size: 11px; color: var(--dim); }
+.pipe .ph.pulse { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 24px rgba(124, 92, 255, 0.35); }
+
+/* 路线图 */
+.timeline { position: relative; padding-left: 26px; }
+.timeline::before { content: ""; position: absolute; left: 9px; top: 6px; bottom: 6px; width: 2px; background: linear-gradient(var(--accent), var(--accent2), transparent); }
+.tl-item { position: relative; margin-bottom: 14px; }
+.tl-item::before { content: ""; position: absolute; left: -22px; top: 18px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); border: 2px solid var(--dim); }
+.tl-item.wip::before { border-color: var(--warn); background: var(--warn); box-shadow: 0 0 14px var(--warn); }
+.tl-item.done::before { border-color: var(--ok); background: var(--ok); }
+
+/* ------------------------------------------------------------ 抽屉 */
+#scrim { position: fixed; inset: 0; background: rgba(2, 4, 10, 0.55); backdrop-filter: blur(2px); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20; }
+#scrim.on { opacity: 1; pointer-events: auto; }
+#drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(620px, 94vw); z-index: 21; transform: translateX(105%); transition: transform .28s cubic-bezier(.2, .8, .2, 1);
+  background: linear-gradient(180deg, #0e1530, #0a0f22); border-left: 1px solid var(--line2); box-shadow: -30px 0 80px rgba(0, 0, 0, 0.5); overflow-y: auto;
+}
+#drawer.on { transform: none; }
+.dr-head { position: sticky; top: 0; z-index: 2; padding: 20px 24px 16px; background: rgba(14, 21, 48, 0.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.dr-close { position: absolute; right: 16px; top: 16px; width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line2); background: var(--panel); color: var(--muted); cursor: pointer; font-size: 16px; }
+.dr-close:hover { color: #fff; border-color: var(--accent); }
+.dr-kind { font-size: 11px; color: var(--dim); letter-spacing: 1.5px; text-transform: uppercase; }
+.dr-title { font-size: 22px; font-weight: 750; margin: 2px 0 4px; display: flex; gap: 10px; align-items: center; }
+.dr-body { padding: 4px 24px 40px; }
+.dr-body h3 { margin-top: 24px; }
+.kv { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; font-size: 13px; }
+.kv .k2 { color: var(--dim); }
+.ex-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-top: 1px dashed var(--line); flex-wrap: wrap; }
+.ex-row:first-child { border-top: none; }
+.ex-row .why { font-size: 11.5px; color: var(--dim); margin-left: auto; }
+
+/* ------------------------------------------------------------ 搜索面板 */
+#palette { position: fixed; inset: 0; z-index: 30; display: none; place-items: start center; padding-top: 12vh; background: rgba(2, 4, 10, 0.6); backdrop-filter: blur(4px); }
+#palette.on { display: grid; }
+.pal { width: min(640px, 92vw); background: #0e1530; border: 1px solid var(--line2); border-radius: 16px; box-shadow: 0 30px 100px rgba(0, 0, 0, 0.6); overflow: hidden; }
+.pal input { width: 100%; border: none; outline: none; background: transparent; color: #fff; font: 17px var(--sans); padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.pal-list { max-height: 56vh; overflow-y: auto; padding: 6px; }
+.pal-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; cursor: pointer; }
+.pal-item.on, .pal-item:hover { background: rgba(124, 92, 255, 0.2); }
+.pal-item .kind { font-size: 11px; color: var(--dim); width: 52px; flex: none; }
+.pal-item .desc { color: var(--muted); font-size: 12px; margin-left: auto; max-width: 50%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+#toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0; background: #1b2347; border: 1px solid var(--line2); padding: 8px 16px; border-radius: 10px; font-size: 13px; transition: all .2s; z-index: 40; pointer-events: none; }
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 900px) {
+  #app { grid-template-columns: 1fr; }
+  #nav { display: none; }
+  .stats { grid-template-columns: repeat(3, 1fr); }
+  .stack { grid-template-columns: 1fr; }
+  .flow { grid-template-columns: 1fr; }
+  .flow .arrow { transform: rotate(90deg); height: 26px; }
+  .hero-units { display: none; }
+  #view { padding: 20px 16px 60px; }
+}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="nav"></aside>
+  <main id="main">
+    <header id="topbar">
+      <div class="crumb" id="crumb"></div>
+      <button class="search-btn" id="searchBtn" type="button">🔍 搜索模块、职业、命令… <span class="kbd">Ctrl K</span></button>
+    </header>
+    <div id="view"></div>
+  </main>
+</div>
+<div id="scrim"></div>
+<aside id="drawer" aria-hidden="true"></aside>
+<div id="palette"><div class="pal"><input id="palInput" placeholder="输入关键字：伐木、攻、jobs、Carry…" autocomplete="off"><div class="pal-list" id="palList"></div></div></div>
+<div id="toast"></div>
+<script>
+// 架构图谱的数据源。
+//
+// 现在（第 0 阶段之前）：手工维护，和 docs/architecture.md、docs/design.md 保持一致。
+// 以后：由 `npm run atlas:export` 从代码里的模块注册表自动导出 status = 'done' 的部分，
+//       还没实现的条目继续留在这里（status = 'draft' / 'wip'）。
+// 每次改完：`npm run atlas` = 校验（引用完整、命令例子都能解析）+ 生成 docs/atlas.html。
+//
+// status: 'draft' 草案 | 'wip' 开发中 | 'done' 已实现
+globalThis.ATLAS = {
+  meta: {
+    title: '诸侯争霸 · 架构图谱',
+    subtitle: 'AI 诸侯只做战略决策，成百上千的职业 NPC 自己干活',
+    version: '0.1-draft',
+    updated: '2026-10-04',
+    source: '设计草案（docs/architecture.md、docs/design.md）',
+  },
+
+  // ------------------------------------------------------------------ 原则
+  principles: [
+    { icon: '🧩', title: '一个功能 = 一个模块', text: '模块向核心登记自己的命令、简报、存档、配置、画面图层；加功能不改核心文件。' },
+    { icon: '📜', title: '命令只定义一次', text: '解析器、AI 命令表、上帝面板按钮、文档、测试，全部从同一份定义生成。' },
+    { icon: '🎯', title: 'AI 只做战略', text: 'NPC 按行为自己干活；AI 给群体下长期命令，一个季节决策几次。' },
+    { icon: '⚖️', title: '规则只有一个入口', text: '所有对世界的改动都走"动作"：NPC、AI、上帝、测试用同一套规则。' },
+    { icon: '🌫️', title: '迷雾第一天就有', text: '每个势力一份情报库；AI 简报只读情报，不读真实数据，撒谎才有意义。' },
+    { icon: '⚡', title: '按大规模来写', text: '数据按紧凑数组存、固定节拍、远处粗算；压测超预算就算测试失败。' },
+  ],
+
+  // ------------------------------------------------------------------ 分层
+  layers: [
+    { id: 'client', name: '前端', en: 'client', color: '#f472b6', deps: ['protocol', 'shared'],
+      role: '浏览器：画面图层、界面面板、镜头、输入 → 命令。只依赖通信格式，绝不碰模拟代码。',
+      dirs: ['src/client/'], items: ['main.ts', 'net.ts', 'camera.ts', 'layers/', 'panels/'], status: 'draft' },
+    { id: 'protocol', name: '通信格式', en: 'protocol', color: '#e879f9', deps: ['shared'], side: true,
+      role: 'WebSocket 消息格式，前后端共用同一份类型：改了一边，另一边编译就报错。',
+      dirs: ['src/protocol/'], items: ['messages.ts', 'codec/'], status: 'draft' },
+    { id: 'server', name: '宿主', en: 'server', color: '#fb923c', deps: ['ai', 'game', 'engine', 'protocol', 'shared'],
+      role: '主循环、WebSocket 网关、视野订阅、存档文件、管理接口（改配置、存读档、时间倍率）。',
+      dirs: ['src/server/'], items: ['main.ts', 'loop.ts', 'gateway.ts', 'interest.ts', 'persistence.ts', 'admin.ts'], status: 'draft' },
+    { id: 'ai', name: 'AI 席位', en: 'ai', color: '#facc15', deps: ['game', 'engine', 'shared'],
+      role: '唤醒 → 拼装简报 → 调用模型（异步，不卡模拟）→ 逐行解析 → 命令总线；全程写日志。',
+      dirs: ['src/ai/'], items: ['seat.ts', 'wake.ts', 'briefing.ts', 'parser.ts', 'providers/', 'prompts/'], status: 'draft' },
+    { id: 'game', name: '玩法模块', en: 'game', color: '#4ade80', deps: ['engine', 'shared', 'content'],
+      role: '每个玩法一个文件夹（world / economy / jobs / military …），通过模块契约向内核登记。',
+      dirs: ['src/game/modules/', 'src/game/index.ts'], items: ['模块清单：加模块 = index.ts 加一行'], status: 'draft' },
+    { id: 'engine', name: '通用内核', en: 'engine', color: '#38bdf8', deps: ['shared'],
+      role: '实体与组件、调度、事件、命令总线、模块注册、空间索引、寻路、存档框架、远近模拟、情报库。不知道"木头"是什么。',
+      dirs: ['src/engine/'], items: ['ecs/', 'scheduler.ts', 'events.ts', 'commands/', 'registry.ts', 'spatial/', 'path/', 'save.ts', 'lod.ts', 'intel.ts', 'clock.ts'], status: 'draft' },
+    { id: 'shared', name: '基础', en: 'shared', color: '#a78bfa', deps: [],
+      role: '类型、可重现随机数、数学、ID。谁都能用，它不依赖任何人。',
+      dirs: ['src/shared/'], items: ['types.ts', 'rng.ts', 'math.ts', 'ids.ts'], status: 'draft' },
+    { id: 'content', name: '内容数据', en: 'content', color: '#94a3b8', deps: ['shared'], side: true,
+      role: '纯数据，没有逻辑：职业、物品、建筑、地形。加一个职业通常只加一份数据。',
+      dirs: ['content/'], items: ['professions/', 'items/', 'buildings/', 'terrain/'], status: 'draft' },
+  ],
+
+  // ------------------------------------------------------------------ 模块契约
+  contract: [
+    { field: 'id', type: 'string', desc: '模块 ID，如 jobs' },
+    { field: 'requires', type: 'string[]', desc: '依赖的模块；注册表据此排序，缺了直接报错' },
+    { field: 'components', type: 'ComponentDef[]', desc: '新的数据列（组件）' },
+    { field: 'systems', type: 'SystemDef[]', desc: '每节拍要跑的逻辑，声明阶段和频率' },
+    { field: 'actions', type: 'ActionDef[]', desc: '改世界的规则（唯一入口），返回 { ok, reason }' },
+    { field: 'orders', type: 'OrderDef[]', desc: '群体可接受的长期命令类型' },
+    { field: 'behaviors', type: 'BehaviorDef[]', desc: 'NPC 能做的行为（fits / start / tick / coarse）' },
+    { field: 'commands', type: 'CommandDef[]', desc: 'AI / 上帝 / 界面可用的命令（带参数格式和例子）' },
+    { field: 'events', type: 'EventDef[]', desc: '会发出的事件（带可见范围）' },
+    { field: 'briefing', type: 'BriefingSection[]', desc: '往 AI 简报里贡献的段落（优先级 + 长度预算）' },
+    { field: 'wake', type: 'WakeRule[]', desc: '哪些事件会叫醒 AI' },
+    { field: 'views', type: 'ViewChannel[]', desc: '往前端推的数据通道；前端有同名图层' },
+    { field: 'content', type: 'ContentSchema[]', desc: '本模块认识的数据类型（如"职业"）' },
+    { field: 'config', type: 'ConfigSchema', desc: '可调参数（默认值 + 校验）' },
+    { field: 'save', type: 'SaveHandler', desc: '存档段 + 版本迁移' },
+    { field: 'install', type: '(api) => void', desc: '兜底：订阅事件、查别的模块公开接口' },
+  ],
+
+  // ------------------------------------------------------------------ 节拍
+  tick: {
+    hz: 10,
+    phases: [
+      { id: 'commands', name: '收命令', text: '本拍之前到达的命令按顺序校验、执行（AI、上帝、界面、测试都一样）' },
+      { id: 'input', name: 'input', text: '外部输入、上帝干预落地' },
+      { id: 'ai_npc', name: 'ai_npc', text: 'NPC 空闲时按长期命令和职业挑行为' },
+      { id: 'act', name: 'act', text: '行为调用动作：采集、投料、攻击……' },
+      { id: 'move', name: 'move', text: '移动、寻路（每拍有计算预算）' },
+      { id: 'resolve', name: 'resolve', text: '战斗结算、产出到账' },
+      { id: 'economy', name: 'economy', text: '仓库、国库、物流' },
+      { id: 'population', name: 'population', text: '吃饭、民心、增长、迁移（多为每游戏日一次）' },
+      { id: 'post', name: 'post', text: '统计、史册' },
+      { id: 'events', name: '派发事件', text: '本拍事件发给订阅者：史册、AI 唤醒、前端通知、其他模块' },
+      { id: 'push', name: '推送', text: '按每个网页的视野推送变化' },
+    ],
+  },
+
+  // ------------------------------------------------------------------ 模块
+  modules: [
+    { id: 'world', name: '世界', icon: '🗺️', requires: [], stage: 0, status: 'draft',
+      summary: '两层地图：地区图（战略）+ 按需生成的 2 米格子区块；资源点、懒刷新、季节。',
+      systems: ['区块加载/卸载', '资源懒刷新', '季节推进'], actions: ['harvestTile', 'till', 'sow', 'reap', 'alterTile'],
+      events: ['season.changed', 'resource.depleted', 'region.discovered'],
+      briefing: ['地区与资源'], views: ['terrain', 'resources', 'regions'],
+      config: ['地图种子', '地图边长 10km', '刷新速率'], save: '种子 + 改动过的格子' },
+    { id: 'economy', name: '经济', icon: '💰', requires: ['world'], stage: 1, status: 'draft',
+      summary: '物品、仓库、国库、搬运。',
+      components: ['Carry'], systems: ['库存账本'], actions: ['deposit', 'withdraw', 'transfer'],
+      events: ['stock.low'], briefing: ['国库'], views: ['stock'], content: ['items'],
+      config: ['物品定义'], save: '各仓库库存' },
+    { id: 'population', name: '人口', icon: '👥', requires: ['economy'], stage: 1, status: 'draft',
+      summary: '吃饭（城镇层面结算）、民心、增长、迁移、名人。',
+      components: ['Identity', 'Vitals', 'Notable'], systems: ['每日口粮', '民心', '人口增长', '迁移'],
+      events: ['npc.born', 'npc.died', 'npc.migrated', 'settlement.starving', 'notable.defected'],
+      wake: ['settlement.starving', 'notable.defected'], briefing: ['城镇人口与民心'], views: ['settlements'],
+      config: ['口粮', '迁移阈值'], save: '城镇、名人' },
+    { id: 'jobs', name: '职业', icon: '🛠️', requires: ['world', 'economy', 'population'], stage: 1, status: 'draft',
+      summary: '职业数据、工作行为、职业比例自动分配、锁定与转职、编组。',
+      components: ['Profession'], orders: ['work', 'haul', 'idle'], actions: ['craft'],
+      systems: ['比例分配', '转职'], events: ['npc.retrained'], briefing: ['劳力分配'], views: ['units'],
+      content: ['professions'], config: ['转职耗时'], save: '比例设置、编组' },
+    { id: 'building', name: '建造', icon: '🏗️', requires: ['world', 'economy', 'jobs'], stage: 1, status: 'draft',
+      summary: '建筑与施工：诸侯只说造什么，建筑工自己搬料施工。',
+      orders: ['build'], actions: ['placeSite', 'contribute', 'demolish'],
+      events: ['building.done', 'building.destroyed'], briefing: ['工程'], views: ['buildings'],
+      content: ['buildings'], save: '建筑与工地' },
+    { id: 'military', name: '军事', icon: '⚔️', requires: ['world', 'population', 'jobs'], stage: 2, status: 'draft',
+      summary: '编队、行军、围城、战斗（远处公式结算，观看时逐个模拟）。',
+      components: ['Combat', 'Equipment'], orders: ['guard', 'patrol', 'move', 'attack', 'escort', 'scout'],
+      systems: ['战斗结算', '围城', '补给'], actions: ['attack', 'capture', 'observe'],
+      events: ['battle.started', 'battle.ended', 'settlement.besieged', 'settlement.captured'],
+      wake: ['settlement.besieged', 'battle.ended', 'settlement.captured'], briefing: ['军队', '敌情'],
+      views: ['armies', 'battles'], save: '部队' },
+    { id: 'diplomacy', name: '外交', icon: '🤝', requires: ['population'], stage: 4, status: 'draft',
+      summary: '私信、公开宣告、条约（不强制执行）、声望、送礼、贸易。',
+      orders: ['trade'], actions: ['exchange'], events: ['message.received', 'treaty.proposed', 'treaty.signed', 'treaty.broken'],
+      wake: ['message.received', 'treaty.proposed', 'treaty.broken'], briefing: ['来信', '条约与声望'],
+      save: '条约、声望、信件' },
+    { id: 'chronicle', name: '史册', icon: '📜', requires: [], stage: 4, status: 'draft',
+      summary: '订阅所有事件，自动编年；按情报可见范围给各方看。',
+      systems: ['记录事件'], briefing: ['近事'], views: ['chronicle'], save: '史册' },
+    { id: 'god', name: '上帝', icon: '☁️', requires: ['world', 'economy', 'population', 'diplomacy', 'military'], stage: 5, status: 'draft',
+      summary: '天灾、天降、冒名信、托梦、召唤流寇、时间倍率。诸侯只看得到后果。',
+      events: ['god.intervened'], views: ['god'], save: '干预记录' },
+  ],
+
+  // ------------------------------------------------------------------ NPC 组件
+  components: [
+    { id: 'Identity', name: '身份', owner: 'population', base: true, fields: [['name', 'string', '名字'], ['faction', 'id', '势力'], ['home', 'id', '所属城镇']] },
+    { id: 'Transform', name: '位置', owner: 'engine', base: true, fields: [['x', 'f32', '米'], ['y', 'f32', '米'], ['region', 'u16', '所在地区']] },
+    { id: 'Motion', name: '移动', owner: 'engine', base: true, fields: [['speed', 'f32', '米/秒'], ['path', 'handle', '路径'], ['target', 'vec2', '目标点']] },
+    { id: 'Vitals', name: '血量', owner: 'population', base: true, fields: [['hp', 'f32', '当前'], ['maxHp', 'f32', '上限']] },
+    { id: 'Carry', name: '携带', owner: 'economy', base: true, fields: [['item', 'u16', '物品种类（只拿一种）'], ['qty', 'u16', '数量'], ['cap', 'u16', '上限']] },
+    { id: 'Profession', name: '职业', owner: 'jobs', base: true, fields: [['prof', 'u16', '职业 ID'], ['skill', 'u8', '熟练度']] },
+    { id: 'Brain', name: '大脑', owner: 'engine', base: true, fields: [['behavior', 'u16', '当前行为'], ['state', 'blob', '行为状态'], ['order', 'id', '所属长期命令（编组共用）']] },
+    { id: 'Membership', name: '编组', owner: 'engine', base: true, fields: [['groups', 'id[]', '所在编组'], ['pinned', 'bool', '是否锁定（直接派出的人）']] },
+    { id: 'Lod', name: '远近', owner: 'engine', base: true, fields: [['mode', 'enum', '细算 / 粗算']] },
+    { id: 'Combat', name: '战斗', owner: 'military', base: false, fields: [['attack', 'f32', '攻击'], ['defense', 'f32', '防御'], ['range', 'f32', '射程']] },
+    { id: 'Equipment', name: '装备', owner: 'military', base: false, fields: [['weapon', 'u8', '兵器等级'], ['armor', 'u8', '护甲等级']] },
+    { id: 'Notable', name: '名人', owner: 'population', base: false, fields: [['traits', 'string[]', '性格'], ['loyalty', 'u8', '忠诚'], ['ambition', 'string', '野心']] },
+  ],
+
+  // ------------------------------------------------------------------ 长期命令
+  orders: [
+    { id: 'work', name: '干活', module: 'jobs', params: ['resource', 'area?'], text: '采集或生产某种资源' },
+    { id: 'haul', name: '搬运', module: 'jobs', params: ['item', 'from', 'to'], text: '在两地之间运东西' },
+    { id: 'build', name: '施工', module: 'building', params: ['site'], text: '去工地搬料施工' },
+    { id: 'guard', name: '驻守', module: 'military', params: ['place'], text: '守住某地，敌人进入就打' },
+    { id: 'patrol', name: '巡逻', module: 'military', params: ['area'], text: '在区域里来回巡视' },
+    { id: 'move', name: '行军', module: 'military', params: ['place'], text: '移动到某地' },
+    { id: 'attack', name: '进攻', module: 'military', params: ['target'], text: '进攻城镇、部队或地区' },
+    { id: 'escort', name: '护送', module: 'military', params: ['who'], text: '跟随并保护某人或某队' },
+    { id: 'scout', name: '侦察', module: 'military', params: ['area'], text: '去某地看情况，写进情报库' },
+    { id: 'trade', name: '通商', module: 'diplomacy', params: ['partner'], text: '带货去别的势力交易' },
+    { id: 'idle', name: '待命', module: 'jobs', params: [], text: '原地待命' },
+  ],
+
+  // ------------------------------------------------------------------ 行为
+  behaviors: [
+    { id: 'gather', acts: ['moveTo', 'harvestTile'], name: '采集', module: 'jobs', fits: ['work'], coarse: true, loop: ['走到资源点', '读条采集', '拿满'], text: '采木头、石头、铁矿' },
+    { id: 'farm', acts: ['moveTo', 'till', 'sow', 'reap'], name: '耕种', module: 'jobs', fits: ['work'], coarse: true, loop: ['开垦', '播种', '收割'], text: '春种秋收，冬天歇' },
+    { id: 'deliver', acts: ['moveTo', 'deposit'], name: '送回', module: 'jobs', fits: [], support: true, coarse: true, loop: ['走回仓库', '卸货'], text: '辅助行为：拿满了送回最近的仓库（采集、耕种之后自动接上，不单独完成命令）' },
+    { id: 'craft', acts: ['withdraw', 'craft', 'deposit'], name: '打造', module: 'jobs', fits: ['work'], coarse: true, loop: ['取料', '打造', '入库'], text: '打兵器、工具' },
+    { id: 'haul', acts: ['withdraw', 'moveTo', 'deposit'], name: '搬运', module: 'jobs', fits: ['haul'], coarse: true, loop: ['去取货', '运送', '卸货'], text: '两地运货' },
+    { id: 'build', acts: ['withdraw', 'moveTo', 'contribute'], name: '施工', module: 'building', fits: ['build'], coarse: true, loop: ['取木石', '走到工地', '投料施工'], text: '把料投进工地' },
+    { id: 'fight', acts: ['moveTo', 'attack'], name: '战斗', module: 'military', fits: ['attack', 'guard', 'escort', 'patrol'], coarse: true, loop: ['锁定敌人', '接近', '攻击'], text: '看见敌人就打' },
+    { id: 'guard', acts: ['moveTo', 'wait'], name: '站岗', module: 'military', fits: ['guard'], coarse: true, loop: ['站位', '警戒'], text: '守在指定位置' },
+    { id: 'patrol', acts: ['moveTo'], name: '巡逻', module: 'military', fits: ['patrol'], coarse: true, loop: ['走向巡逻点', '换下一个点'], text: '区域内来回走' },
+    { id: 'march', acts: ['moveTo'], name: '行军', module: 'military', fits: ['move'], coarse: true, loop: ['沿地区图走', '到达'], text: '远途移动（进攻、侦察时由对应行为调用）' },
+    { id: 'escort', acts: ['moveTo', 'attack'], name: '随行', module: 'military', fits: ['escort'], coarse: true, loop: ['跟随目标', '护卫'], text: '贴身保护' },
+    { id: 'scout', acts: ['moveTo', 'observe'], name: '探查', module: 'military', fits: ['scout'], coarse: true, loop: ['抵近观察', '回报情报'], text: '把看到的写进己方情报库' },
+    { id: 'trade', acts: ['withdraw', 'moveTo', 'exchange'], name: '贩运', module: 'diplomacy', fits: ['trade'], coarse: true, loop: ['装货', '赶路', '交易', '回程'], text: '商队往返' },
+    { id: 'flee', acts: ['moveTo'], name: '逃跑', module: 'jobs', fits: ['*'], coarse: true, loop: ['察觉危险', '跑回城'], text: '非战斗职业遇险自动逃' },
+    { id: 'idle', acts: ['wait'], name: '闲着', module: 'jobs', fits: ['idle', '*'], coarse: true, loop: ['原地等待'], text: '没活可干时的兜底' },
+  ],
+
+  // ------------------------------------------------------------------ 职业
+  professions: [
+    { id: 'farmer', name: '农夫', short: '农', color: '#84cc16', tags: ['worker'], status: 'draft',
+      stats: { speed: 1.0, carry: 10, hp: 100, attack: 2 }, behaviors: ['farm', 'deliver', 'flee', 'idle'],
+      defaultOrder: 'work: 粮食', tools: { 锄头: 1.4 }, upkeep: { 粮: 1 }, train: { cost: { 粮: 3 }, days: 1 },
+      text: '在城镇附近的田里春种秋收，是全国的饭碗。冬天田里不产粮。' },
+    { id: 'woodcutter', name: '伐木工', short: '木', color: '#d97706', tags: ['worker'], status: 'draft',
+      stats: { speed: 1.0, carry: 10, hp: 100, attack: 3 }, behaviors: ['gather', 'deliver', 'flee', 'idle'],
+      defaultOrder: 'work: 木头', tools: { 斧头: 1.5 }, upkeep: { 粮: 1 }, train: { cost: { 粮: 3 }, days: 1 },
+      text: '去林区砍树，背满了送回仓库。木头是建造和兵器的基础。' },
+    { id: 'mason', name: '石匠', short: '石', color: '#94a3b8', tags: ['worker'], status: 'draft',
+      stats: { speed: 0.9, carry: 8, hp: 110, attack: 3 }, behaviors: ['gather', 'deliver', 'flee', 'idle'],
+      defaultOrder: 'work: 石头', tools: { 镐: 1.4 }, upkeep: { 粮: 1 }, train: { cost: { 粮: 3 }, days: 1 },
+      text: '采石，供城墙和大建筑用。' },
+    { id: 'miner', name: '矿工', short: '矿', color: '#64748b', tags: ['worker'], status: 'draft',
+      stats: { speed: 0.9, carry: 8, hp: 110, attack: 3 }, behaviors: ['gather', 'deliver', 'flee', 'idle'],
+      defaultOrder: 'work: 铁', tools: { 镐: 1.3 }, upkeep: { 粮: 1.5 }, train: { cost: { 粮: 4 }, days: 2 },
+      text: '挖铁矿。没有铁就没有兵器，铁矿点是兵家必争之地。' },
+    { id: 'builder', name: '建筑工', short: '建', color: '#f59e0b', tags: ['worker'], status: 'draft',
+      stats: { speed: 1.0, carry: 10, hp: 100, attack: 2 }, behaviors: ['build', 'haul', 'flee', 'idle'],
+      defaultOrder: 'build: 队列里下一个工地', tools: { 锤子: 1.5 }, upkeep: { 粮: 1 }, train: { cost: { 粮: 3 }, days: 1 },
+      text: '按诸侯的建造单从仓库取料去工地施工。' },
+    { id: 'smith', name: '铁匠', short: '铁', color: '#ef4444', tags: ['worker'], status: 'draft',
+      stats: { speed: 0.9, carry: 6, hp: 100, attack: 4 }, behaviors: ['craft', 'haul', 'idle'],
+      defaultOrder: 'work: 兵器', tools: {}, upkeep: { 粮: 1 }, train: { cost: { 粮: 5 }, days: 3 },
+      text: '在铁匠铺把铁和木头打成兵器和工具。' },
+    { id: 'porter', name: '搬运工', short: '运', color: '#14b8a6', tags: ['worker'], status: 'draft',
+      stats: { speed: 1.1, carry: 20, hp: 100, attack: 2 }, behaviors: ['haul', 'deliver', 'flee', 'idle'],
+      defaultOrder: 'idle', tools: {}, upkeep: { 粮: 1 }, train: { cost: { 粮: 2 }, days: 1 },
+      text: '在前哨和城镇之间运货。路上可能被劫。' },
+    { id: 'soldier', name: '士兵', short: '兵', color: '#3b82f6', tags: ['military'], status: 'draft',
+      stats: { speed: 1.1, carry: 5, hp: 150, attack: 12 }, behaviors: ['fight', 'guard', 'patrol', 'march', 'escort', 'idle'],
+      defaultOrder: 'guard: 所属城镇', tools: { 兵器: 1.6 }, upkeep: { 粮: 1.5 }, train: { cost: { 粮: 5, 铁: 1 }, days: 2 },
+      text: '驻守、巡逻、行军、攻城。吃得多，还要铁做兵器。' },
+    { id: 'scout', name: '斥候', short: '斥', color: '#a855f7', tags: ['military'], status: 'draft',
+      stats: { speed: 1.6, carry: 3, hp: 80, attack: 4 }, behaviors: ['scout', 'march', 'flee', 'idle'],
+      defaultOrder: 'idle', tools: {}, upkeep: { 粮: 1 }, train: { cost: { 粮: 4 }, days: 2 },
+      text: '跑得快。去别人地盘看兵力和粮草，写进己方情报库。' },
+    { id: 'merchant', name: '商人', short: '商', color: '#eab308', tags: ['worker'], status: 'draft',
+      stats: { speed: 1.0, carry: 30, hp: 90, attack: 2 }, behaviors: ['trade', 'haul', 'flee', 'idle'],
+      defaultOrder: 'idle', tools: {}, upkeep: { 粮: 1 }, train: { cost: { 粮: 4, 金: 20 }, days: 2 },
+      text: '带货去别的势力换东西。商路也是情报和冲突的来源。' },
+  ],
+
+  // ------------------------------------------------------------------ 选择器
+  selectors: [
+    { syntax: '@木 / @伐木工', meaning: '我所有的伐木工（职业简称或全称）' },
+    { syntax: '@木@青石城', meaning: '青石城的伐木工' },
+    { syntax: '@木:5', meaning: '5 个伐木工（优先空闲的、离得近的）' },
+    { syntax: '@农:30%', meaning: '三成农夫' },
+    { syntax: '@worker', meaning: '按标签选：所有干活的（worker / military）' },
+    { syntax: '#一队', meaning: '已编好的队伍' },
+    { syntax: '阿三', meaning: '指定某个人' },
+    { syntax: '@木,@石', meaning: '多选：伐木工和石匠' },
+    { syntax: '*@河口镇', meaning: '河口镇所有人' },
+  ],
+
+  // ------------------------------------------------------------------ 命令
+  // args 类型：sel 选择器 · town 己方城镇 · place 地点 · target 势力.城镇/地区 · work 活 ·
+  //           prof 职业 · item 物品 · building 建筑 · group 队名 · faction 势力 · notable 名人 ·
+  //           int 整数 · amount 数量（粮200/300金） · duration 时长（30天） · treaty 条约 ·
+  //           disaster 天灾 · quota 职业比例（余下全部） · text 文字（余下全部）
+  // 参数名后面带 ? 表示可省略
+  commands: [
+    { id: 'quota', verb: '比例', module: 'jobs', who: ['lord'], args: [['城镇', 'town'], ['比例', 'quota']],
+      help: '设城镇的职业比例，系统自动把空闲的人分配/转职过去（锁定的人不动）', examples: ['比例 青石城 农50 木20 石10 兵20'] },
+    { id: 'assign', verb: '派', module: 'jobs', who: ['lord', 'god'], order: 'work', args: [['人', 'sel'], ['活', 'work'], ['地点?', 'place']],
+      help: '把一批人派去干某种活；派出去的人会锁定，直到"放"', examples: ['派 @木:5 伐木 北林', '派 @农@河口镇 种田'] },
+    { id: 'haul', verb: '运', module: 'jobs', who: ['lord'], order: 'haul', args: [['人', 'sel'], ['物品', 'item'], ['从', 'place'], ['到', 'place']],
+      help: '让一批人在两地之间运货', examples: ['运 @运:4 木头 北林 青石城'] },
+    { id: 'release', verb: '放', module: 'jobs', who: ['lord'], args: [['人', 'sel']],
+      help: '解除锁定，还给职业比例自动分配', examples: ['放 @木@北林'] },
+    { id: 'retrain', verb: '转', module: 'jobs', who: ['lord'], args: [['人', 'sel'], ['职业', 'prof']],
+      help: '转职（要花粮食和时间，见职业数据）', examples: ['转 @农:10 兵'] },
+    { id: 'group', verb: '编', module: 'jobs', who: ['lord'], args: [['人', 'sel'], ['队名', 'group']],
+      help: '把一批人编成队伍，之后用 #队名 指挥', examples: ['编 @兵@青石城:20 一队'] },
+    { id: 'build', verb: '建', module: 'building', who: ['lord'], order: 'build', args: [['建筑', 'building'], ['地点', 'place'], ['人?', 'sel']],
+      help: '下建造单；不指定人就交给建筑工队列', examples: ['建 兵营 青石城', '建 城墙 河口镇 @建:6'] },
+    { id: 'demolish', verb: '拆', module: 'building', who: ['lord'], args: [['建筑', 'building'], ['地点', 'place']],
+      help: '拆掉建筑，退回部分材料', examples: ['拆 伐木场 北林'] },
+    { id: 'attack', verb: '攻', module: 'military', who: ['lord'], order: 'attack', args: [['人', 'sel'], ['目标', 'target']],
+      help: '进攻城镇、部队或地区（持续，直到撤回或打完）', examples: ['攻 #一队 赤焰.河口镇'] },
+    { id: 'guard', verb: '守', module: 'military', who: ['lord'], order: 'guard', args: [['人', 'sel'], ['地点', 'place']],
+      help: '驻守某地', examples: ['守 #二队 青石城'] },
+    { id: 'patrol', verb: '巡', module: 'military', who: ['lord'], order: 'patrol', args: [['人', 'sel'], ['区域', 'place']],
+      help: '在区域里巡逻', examples: ['巡 @兵:6 北林'] },
+    { id: 'retreat', verb: '撤', module: 'military', who: ['lord'], order: 'move', args: [['人', 'sel'], ['地点?', 'place']],
+      help: '撤回（不写地点就回所属城镇）', examples: ['撤 #一队'] },
+    { id: 'scout', verb: '探', module: 'military', who: ['lord'], order: 'scout', args: [['人', 'sel'], ['区域', 'place']],
+      help: '侦察某地，结果写进情报库', examples: ['探 @斥:2 东山'] },
+    { id: 'escort', verb: '护', module: 'military', who: ['lord'], order: 'escort', args: [['人', 'sel'], ['对象', 'sel']],
+      help: '护送某人或某队', examples: ['护 #三队 #商队'] },
+    { id: 'trade', verb: '商', module: 'diplomacy', who: ['lord'], order: 'trade', args: [['人', 'sel'], ['对方', 'faction']],
+      help: '派商队去某势力交易', examples: ['商 @商:2 白鹿'] },
+    { id: 'tax', verb: '税', module: 'population', who: ['lord'], args: [['城镇', 'town'], ['税率', 'int']],
+      help: '设税率（%）。税高民心降', examples: ['税 青石城 15'] },
+    { id: 'granary', verb: '开仓', module: 'population', who: ['lord'], args: [['城镇', 'town'], ['粮', 'int']],
+      help: '开仓放粮，提升民心', examples: ['开仓 河口镇 200'] },
+    { id: 'recruit', verb: '招', module: 'population', who: ['lord'], args: [['名人', 'notable'], ['出价', 'amount']],
+      help: '招揽或策反名人', examples: ['招 李将军 300金'] },
+    { id: 'letter', verb: '信', module: 'diplomacy', who: ['lord'], args: [['对方', 'faction'], ['内容', 'text']],
+      help: '私信，只有对方看得到（可以撒谎）', examples: ['信 赤焰 北林归你，河口归我，如何？'] },
+    { id: 'proclaim', verb: '告', module: 'diplomacy', who: ['lord'], args: [['内容', 'text']],
+      help: '公开宣告，所有诸侯都看得到', examples: ['告 赤焰背约在先，天下共讨之'] },
+    { id: 'propose', verb: '约', module: 'diplomacy', who: ['lord'], args: [['对方', 'faction'], ['条约', 'treaty'], ['时长?', 'duration']],
+      help: '提议条约', examples: ['约 赤焰 互不侵犯 30天'] },
+    { id: 'accept', verb: '应', module: 'diplomacy', who: ['lord'], args: [['对方', 'faction']],
+      help: '接受对方提议的条约', examples: ['应 赤焰'] },
+    { id: 'break', verb: '撕', module: 'diplomacy', who: ['lord'], args: [['对方', 'faction'], ['条约', 'treaty']],
+      help: '撕毁条约（会记进公开史册，影响声望）', examples: ['撕 赤焰 互不侵犯'] },
+    { id: 'gift', verb: '赠', module: 'diplomacy', who: ['lord'], args: [['对方', 'faction'], ['东西', 'amount']],
+      help: '送礼', examples: ['赠 白鹿 粮200'] },
+    { id: 'think', verb: '想', module: 'ai', who: ['lord'], args: [['内容', 'text']],
+      help: '心里话：写下计划和判断，只有上帝看得到，下次醒来时带上', examples: ['想 赤焰兵多粮少，拖到冬天再打'] },
+    { id: 'disaster', verb: '灾', module: 'god', who: ['god'], args: [['天灾', 'disaster'], ['地点', 'place'], ['时长?', 'duration']],
+      help: '降天灾：旱、涝、疫、蝗', examples: ['灾 旱 北林 10天'] },
+    { id: 'bless', verb: '赐', module: 'god', who: ['god'], args: [['对方', 'faction'], ['东西', 'amount']],
+      help: '天降资源', examples: ['赐 白鹿 铁100'] },
+    { id: 'forge', verb: '冒名', module: 'god', who: ['god'], args: [['冒充谁', 'faction'], ['发给谁', 'faction'], ['内容', 'text']],
+      help: '冒名给某诸侯写私信，对方分不出真假', examples: ['冒名 赤焰 白鹿 我军三日后借道'] },
+    { id: 'dream', verb: '托梦', module: 'god', who: ['god'], args: [['对方', 'faction'], ['内容', 'text']],
+      help: '以"上天"身份对某诸侯说话', examples: ['托梦 白鹿 东方有变'] },
+    { id: 'bandits', verb: '寇', module: 'god', who: ['god'], args: [['地点', 'place'], ['人数', 'int']],
+      help: '召唤流寇', examples: ['寇 东山 50'] },
+    { id: 'speed', verb: '时速', module: 'god', who: ['god'], args: [['倍率', 'int']],
+      help: '时间倍率（0 = 暂停）', examples: ['时速 4'] },
+  ],
+
+  // 命令试验台用的示例世界（只用来校验名字，不是真实存档）
+  sampleWorld: {
+    me: '青龙',
+    factions: ['青龙', '赤焰', '白鹿', '玄武'],
+    towns: { 青龙: ['青石城', '河口镇'], 赤焰: ['赤焰城', '河口镇'], 白鹿: ['鹿鸣城'], 玄武: ['北冥城'] },
+    myTowns: ['青石城', '河口镇'],
+    places: ['青石城', '河口镇', '北林', '东山', '南湖', '西岭', '赤焰城', '鹿鸣城', '北冥城'],
+    groups: ['一队', '二队', '三队', '商队'],
+    people: ['阿三', '阿四', '老王'],
+    notables: ['李将军', '张谋士'],
+    items: ['粮', '粮食', '木头', '石头', '铁', '金', '兵器', '工具'],
+    works: { 伐木: 'woodcutter', 采石: 'mason', 挖矿: 'miner', 种田: 'farmer', 打铁: 'smith' },
+    buildings: ['房屋', '农田', '伐木场', '采石场', '矿场', '仓库', '兵营', '铁匠铺', '市场', '城墙', '道路'],
+    treaties: ['结盟', '互不侵犯', '朝贡', '通商', '借道'],
+    disasters: ['旱', '涝', '疫', '蝗'],
+  },
+
+  // ------------------------------------------------------------------ 扩展指南
+  recipes: [
+    { id: 'profession', title: '加一个职业', steps: ['在 content/professions/ 加一份数据（属性、行为、默认命令、口粮、转职）', '跑 npm run atlas，图谱里自动出现'], note: '只有全新种类的活才需要写新行为。' },
+    { id: 'item', title: '加一种建筑 / 物品', steps: ['在 content/buildings/ 或 content/items/ 加数据', '有特殊效果的话，在相关模块加一个系统'] },
+    { id: 'command', title: '加一条命令', steps: ['在相关模块的 commands 里加一个 CommandDef（动词、参数、说明、例子）', '解析器、AI 命令表、上帝面板按钮、文档、契约测试自动跟上'] },
+    { id: 'behavior', title: '加一种活 / 行为', steps: ['在相关模块加一个 BehaviorDef（fits / start / tick / coarse）', '在职业数据的 behaviors 里写上它的 ID'] },
+    { id: 'briefing', title: 'AI 简报里多看一样东西', steps: ['在模块里加一个 BriefingSection（优先级 + 长度预算）'] },
+    { id: 'module', title: '加一个全新玩法（比如"宗教"）', steps: ['npm run new:module religion 生成模板', '组件 → 系统 → 动作 → 命令 → 事件 → 简报 → 存档 → 配置', '前端加同名图层（如有画面）', '写测试', '在 src/game/index.ts 加一行'], note: '核心文件一个都不用改。' },
+  ],
+
+  // ------------------------------------------------------------------ 测试与守门
+  gates: [
+    { name: '模块单元测试', text: '每个模块自己的规则' },
+    { name: '命令契约测试', text: '每条命令的每个例子都能真正执行成功' },
+    { name: '可重现测试', text: '同种子 + 同命令，跑 N 个游戏日后状态哈希一致' },
+    { name: '分层测试', text: '不许向上依赖、不许绕过模块公开接口' },
+    { name: '存档测试', text: '存了再读一致；旧版本存档能迁移' },
+    { name: '协议测试', text: '消息编码再解码一致' },
+    { name: '压测预算', text: '10km 地图 + 2000 NPC，每节拍 < 5ms，超了就失败' },
+    { name: '脚本 AI 长跑', text: '无人值守跑 N 年不崩、没有异常增长' },
+    { name: '图谱校验', text: '本页面的数据引用完整、命令例子都能解析（已接入：npm run atlas）' },
+  ],
+
+  // ------------------------------------------------------------------ 路线图
+  roadmap: [
+    { stage: 0, name: '地基', status: 'wip', text: '骨架、测试运行器、固定节拍、地图生成、镜头缩放、色块渲染、压测', goal: '10km 大陆上 2000 个色块小人干活不卡' },
+    { stage: 1, name: '经济', status: 'draft', text: '城镇、职业与工作循环、建筑、资源刷新、季节、吃饭与迁移、远处粗算', goal: '几座城自己运转，冬天会饿' },
+    { stage: 2, name: '军事领土', status: 'draft', text: '征兵、部队、行军、围城、战斗结算、领地', goal: '脚本诸侯会打仗、换城' },
+    { stage: 3, name: 'AI 诸侯', status: 'draft', text: '简报、命令、唤醒、模型接入、脚本 AI、日志', goal: '大模型诸侯自己经营和开战（关键验收点）' },
+    { stage: 4, name: '外交信息', status: 'draft', text: '私信、宣告、条约、史册、声望、迷雾、名人、贸易', goal: '结盟、背叛、撒谎' },
+    { stage: 5, name: '上帝模式', status: 'draft', text: '干预工具、心里话面板、关系图、时间控制', goal: '你能看戏和搅局' },
+    { stage: 6, name: '无尽演化', status: 'draft', text: '起义、叛将自立、席位交接、存读档、长跑平衡', goal: '世界一直跑下去' },
+  ],
+
+  // ------------------------------------------------------------------ 待定
+  decisions: [
+    { q: '命令用中文动词还是英文？', proposal: '中文（内部 ID 英文）', status: 'open' },
+    { q: '选择器符号 @职业 #队伍 :数量 :30% 可以吗？', proposal: '如上', status: 'open' },
+    { q: '"比例 + 直接派会锁定"双模式可以吗？', proposal: '可以', status: 'open' },
+    { q: 'AI 席位数', proposal: '4–6 位诸侯', status: 'open' },
+    { q: '战斗观赏度', proposal: '第一版公式结算 + 简单动画', status: 'open' },
+    { q: '时间节奏：1 天 ≈ 10 秒？', proposal: '是，可调', status: 'open' },
+    { q: '游戏名', proposal: '暂名"诸侯争霸"', status: 'open' },
+    { q: '新仓库 AGENTS.md 协作约定', proposal: '沿用旧仓库规矩并改写', status: 'open' },
+    { q: '技术栈', proposal: 'TypeScript：网页画面 + 后端模拟', status: 'decided' },
+    { q: '模型接入', proposal: '后端直接调用 OpenAI 兼容接口 + 脚本 AI', status: 'decided' },
+  ],
+};
+
+</script>
+<script>
+// 命令与选择器解析（浏览器和 Node 共用；不依赖任何库）。
+//
+// 这是第 0 阶段之前的**规格原型**：语法和将来 src/engine/commands/ 的解析器保持一致，
+// 图谱页面的"命令试验台"和 tools/check-atlas.mjs 都用它。
+(function () {
+  'use strict';
+
+  function index(atlas) {
+    const profs = new Map();
+    for (const p of atlas.professions) {
+      profs.set(p.id, p); profs.set(p.name, p); profs.set(p.short, p);
+    }
+    const tags = new Set(atlas.professions.flatMap((p) => p.tags));
+    const cmds = new Map();
+    for (const c of atlas.commands) { cmds.set(c.verb, c); cmds.set(c.id, c); }
+    return { profs, tags, cmds, w: atlas.sampleWorld };
+  }
+
+  const ok = (value, show) => ({ ok: true, value, show });
+  const bad = (error, hint) => ({ ok: false, error, hint });
+
+  // ---------------------------------------------------------------- 选择器
+  // 一段：头部（@职业|@标签|*|#队伍|人名）+ 可选 @地点 + 可选 :数量 / :百分比，用逗号多选
+  function parseSelector(text, ix) {
+    if (!text) return bad('缺少选择器', '例：@木:5、#一队、阿三');
+    const parts = [];
+    for (const raw of text.split(',')) {
+      const seg = raw.trim();
+      if (!seg) return bad('选择器里有空段', '多选用逗号隔开：@木,@石');
+      let i = 0; const part = { raw: seg };
+      const readName = () => { let s = ''; while (i < seg.length && seg[i] !== '@' && seg[i] !== ':') s += seg[i++]; return s; };
+      if (seg[0] === '@') {
+        i = 1; const n = readName();
+        const p = ix.profs.get(n);
+        if (p) { part.kind = 'prof'; part.prof = p.id; part.label = p.name; }
+        else if (ix.tags.has(n)) { part.kind = 'tag'; part.tag = n; part.label = '标签 ' + n; }
+        else return bad(`没有叫"${n}"的职业或标签`, '职业简称：' + [...new Set([...ix.profs.values()].map((x) => x.short))].join(' '));
+      } else if (seg[0] === '*') {
+        i = 1; part.kind = 'all'; part.label = '所有人';
+      } else if (seg[0] === '#') {
+        i = 1; const n = readName();
+        if (!n) return bad('# 后面要写队名');
+        part.kind = 'group'; part.group = n; part.label = '队伍 ' + n;
+        if (!ix.w.groups.includes(n)) part.warn = `示例世界里还没有队伍"${n}"（真实游戏里要先"编"）`;
+      } else {
+        const n = readName();
+        if (!ix.w.people.includes(n) && !ix.w.notables.includes(n)) return bad(`不认识"${n}"`, '选职业要加 @，选队伍要加 #；人名示例：' + ix.w.people.join('、'));
+        part.kind = 'person'; part.person = n; part.label = n;
+      }
+      while (i < seg.length) {
+        if (seg[i] === '@') {
+          i++; const pl = readName();
+          if (!ix.w.places.includes(pl)) return bad(`没有地点"${pl}"`, '示例地点：' + ix.w.places.join('、'));
+          if (part.place) return bad('一段选择器只能限定一个地点');
+          part.place = pl;
+        } else if (seg[i] === ':') {
+          i++; let num = ''; while (i < seg.length && /[0-9]/.test(seg[i])) num += seg[i++];
+          let pct = false; if (seg[i] === '%') { pct = true; i++; }
+          const n = parseInt(num, 10);
+          if (!num || n <= 0) return bad('冒号后面要写正整数', '例：@木:5 或 @农:30%');
+          if (pct && n > 100) return bad('百分比不能超过 100');
+          if (part.kind === 'person') return bad('指定某个人时不能再写数量');
+          if (pct) part.percent = n; else part.count = n;
+        } else return bad(`选择器"${seg}"写法不对`);
+      }
+      parts.push(part);
+    }
+    const show = parts.map((p) => {
+      let s = p.label;
+      if (p.place) s = p.place + '的' + s;
+      if (p.count) s += ` ×${p.count}`;
+      if (p.percent) s += ` ${p.percent}%`;
+      return s;
+    }).join(' + ');
+    return ok(parts, show);
+  }
+
+  // ---------------------------------------------------------------- 参数类型
+  const TYPES = {
+    sel: { name: '选择器', parse: (t, ix) => parseSelector(t, ix) },
+    town: { name: '己方城镇', parse: (t, ix) => (ix.w.myTowns.includes(t) ? ok(t) : bad(`"${t}"不是你的城镇`, '你的城镇：' + ix.w.myTowns.join('、'))) },
+    place: { name: '地点', parse: (t, ix) => (ix.w.places.includes(t) ? ok(t) : bad(`没有地点"${t}"`, '示例地点：' + ix.w.places.join('、'))) },
+    target: { name: '目标', parse: (t, ix) => {
+      if (t.includes('.')) {
+        const [f, town] = t.split('.');
+        if (!ix.w.factions.includes(f)) return bad(`没有势力"${f}"`);
+        if (!(ix.w.towns[f] || []).includes(town)) return bad(`${f}没有城镇"${town}"`, `${f}的城镇：` + (ix.w.towns[f] || []).join('、'));
+        return ok({ faction: f, town }, `${f} 的 ${town}`);
+      }
+      return ix.w.places.includes(t) ? ok({ place: t }, t) : bad(`没有目标"${t}"`, '写成 势力.城镇 或地点名');
+    } },
+    work: { name: '活', parse: (t, ix) => (ix.w.works[t] ? ok(t, `${t}（${ix.profs.get(ix.w.works[t]).name}的活）`) : bad(`没有"${t}"这种活`, '可选：' + Object.keys(ix.w.works).join('、'))) },
+    prof: { name: '职业', parse: (t, ix) => { const p = ix.profs.get(t); return p ? ok(p.id, p.name) : bad(`没有职业"${t}"`); } },
+    item: { name: '物品', parse: (t, ix) => (ix.w.items.includes(t) ? ok(t) : bad(`没有物品"${t}"`, '可选：' + ix.w.items.join('、'))) },
+    building: { name: '建筑', parse: (t, ix) => (ix.w.buildings.includes(t) ? ok(t) : bad(`没有建筑"${t}"`, '可选：' + ix.w.buildings.join('、'))) },
+    group: { name: '队名', parse: (t) => { const n = t.replace(/^#/, ''); return n ? ok(n, '#' + n) : bad('缺少队名'); } },
+    faction: { name: '势力', parse: (t, ix) => (t === ix.w.me ? bad('不能对自己') : ix.w.factions.includes(t) ? ok(t) : bad(`没有势力"${t}"`, '示例势力：' + ix.w.factions.filter((f) => f !== ix.w.me).join('、'))) },
+    notable: { name: '名人', parse: (t, ix) => (ix.w.notables.includes(t) ? ok(t) : bad(`不认识名人"${t}"`, '示例：' + ix.w.notables.join('、'))) },
+    int: { name: '整数', parse: (t) => (/^\d+$/.test(t) ? ok(parseInt(t, 10)) : bad(`"${t}"不是整数`)) },
+    amount: { name: '数量', parse: (t, ix) => {
+      const items = [...ix.w.items].sort((a, b) => b.length - a.length);
+      for (const it of items) {
+        let m = t.match(new RegExp('^' + it + '(\\d+)$')); if (m) return ok({ item: it, n: +m[1] }, `${it} ${m[1]}`);
+        m = t.match(new RegExp('^(\\d+)' + it + '$')); if (m) return ok({ item: it, n: +m[1] }, `${it} ${m[1]}`);
+      }
+      return bad(`"${t}"不是数量写法`, '例：粮200 或 300金');
+    } },
+    duration: { name: '时长', parse: (t) => { const m = t.match(/^(\d+)(天|日|季|年)$/); return m ? ok({ n: +m[1], unit: m[2] }, t) : bad(`"${t}"不是时长`, '例：30天、2季'); } },
+    treaty: { name: '条约', parse: (t, ix) => (ix.w.treaties.includes(t) ? ok(t) : bad(`没有条约"${t}"`, '可选：' + ix.w.treaties.join('、'))) },
+    disaster: { name: '天灾', parse: (t, ix) => (ix.w.disasters.includes(t) ? ok(t) : bad(`没有天灾"${t}"`, '可选：' + ix.w.disasters.join('、'))) },
+    quota: { name: '职业比例', rest: true, parse: (toks, ix) => {
+      if (!toks.length) return bad('缺少比例', '例：农50 木20 兵30');
+      const out = []; let sum = 0;
+      for (const t of toks) {
+        const m = t.match(/^(\D+?)(\d+)%?$/);
+        const p = m && ix.profs.get(m[1]);
+        if (!p) return bad(`"${t}"不是"职业+数字"`, '例：农50');
+        out.push({ prof: p.id, pct: +m[2] }); sum += +m[2];
+      }
+      if (sum > 100) return bad(`比例加起来 ${sum}，超过 100`);
+      return ok(out, out.map((o) => `${ix.profs.get(o.prof).name} ${o.pct}%`).join('，') + (sum < 100 ? `（余下 ${100 - sum}% 不指定）` : ''));
+    } },
+    text: { name: '文字', rest: true, parse: (toks) => (toks.length ? ok(toks.join(' ')) : bad('缺少内容')) },
+  };
+
+  // ---------------------------------------------------------------- 命令
+  function parseCommand(line, atlas, opts) {
+    const ix = opts && opts.ix ? opts.ix : index(atlas);
+    const who = (opts && opts.who) || null;
+    const toks = String(line || '').trim().split(/\s+/).filter(Boolean);
+    if (!toks.length) return { ok: false, error: '空命令' };
+    const verb = toks[0];
+    const cmd = ix.cmds.get(verb);
+    if (!cmd) {
+      const near = atlas.commands.filter((c) => c.verb.includes(verb) || verb.includes(c.verb)).map((c) => c.verb);
+      return { ok: false, error: `没有命令"${verb}"`, hint: near.length ? '是不是：' + near.join('、') : '命令列表见"命令"一页' };
+    }
+    if (who && !cmd.who.includes(who)) return { ok: false, cmd, error: `"${cmd.verb}"不是${who === 'god' ? '上帝' : '诸侯'}能用的命令` };
+    const args = []; let k = 1;
+    for (const [rawName, type] of cmd.args) {
+      const optional = rawName.endsWith('?'); const name = rawName.replace('?', '');
+      const T = TYPES[type];
+      if (!T) return { ok: false, cmd, error: `内部错误：未知参数类型 ${type}` };
+      if (T.rest) {
+        const res = T.parse(toks.slice(k), ix); k = toks.length;
+        if (!res.ok) return { ok: false, cmd, args, error: `${name}：${res.error}`, hint: res.hint };
+        args.push({ name, type, typeName: T.name, raw: res.value, show: res.show || String(res.value) });
+        continue;
+      }
+      if (k >= toks.length) {
+        if (optional) { args.push({ name, type, typeName: T.name, skipped: true }); continue; }
+        return { ok: false, cmd, args, error: `缺少参数：${name}（${T.name}）`, hint: '格式：' + signature(cmd) };
+      }
+      const res = T.parse(toks[k], ix);
+      if (!res.ok) return { ok: false, cmd, args, error: `${name}：${res.error}`, hint: res.hint };
+      args.push({ name, type, typeName: T.name, token: toks[k], raw: res.value, show: res.show || String(res.value) });
+      k++;
+    }
+    if (k < toks.length) return { ok: false, cmd, args, error: `多了参数：${toks.slice(k).join(' ')}`, hint: '格式：' + signature(cmd) };
+    const warns = args.flatMap((a) => (a.type === 'sel' && Array.isArray(a.raw) ? a.raw.filter((p) => p.warn).map((p) => p.warn) : []));
+    return { ok: true, cmd, args, warns };
+  }
+
+  function signature(cmd) {
+    return cmd.verb + ' ' + cmd.args.map(([n, t]) => {
+      const opt = n.endsWith('?'); const name = n.replace('?', '');
+      const s = (TYPES[t] && TYPES[t].rest) ? name + '…' : name;
+      return opt ? `[${s}]` : `<${s}>`;
+    }).join(' ');
+  }
+
+  // ---------------------------------------------------------------- 推导：职业 → 能接的命令
+  function professionOrders(prof, atlas) {
+    const bs = atlas.behaviors.filter((b) => prof.behaviors.includes(b.id));
+    return atlas.orders.filter((o) => bs.some((b) => b.fits.includes(o.id)));
+  }
+
+  function professionCommands(prof, atlas) {
+    const w = atlas.sampleWorld;
+    const orderIds = new Set(professionOrders(prof, atlas).map((o) => o.id));
+    const myWork = Object.keys(w.works).find((k) => w.works[k] === prof.id);
+    const sel = `@${prof.short}:5`;
+    const fill = { town: '青石城', place: '北林', target: '赤焰.河口镇', item: '木头', prof: prof.id === 'soldier' ? '农' : '兵',
+      group: prof.short + '队', faction: '白鹿', building: '兵营', int: '10', duration: '30天' };
+    const out = [];
+    for (const c of atlas.commands) {
+      if (!c.who.includes('lord')) continue;
+      const selArgs = c.args.filter(([, t]) => t === 'sel');
+      if (c.id === 'quota') {
+        const other = prof.short === '农' ? '木' : '农';
+        out.push({ cmd: c, example: `比例 青石城 ${prof.short}30 ${other}50`, why: '职业比例里写上它' });
+        continue;
+      }
+      if (!selArgs.length) continue;
+      if (c.order && !orderIds.has(c.order)) continue;
+      if (c.order === 'work' && !myWork) continue;
+      const parts = [c.verb]; let firstSel = true;
+      const places = c.id === 'build' ? ['青石城'] : ['北林', '青石城'];
+      for (const [n, t] of c.args) {
+        const optional = n.endsWith('?');
+        if (t === 'sel') {
+          if (firstSel) { parts.push(sel); firstSel = false; } else if (!optional) parts.push('#商队');
+          else parts.push(sel);
+        } else if (t === 'work') parts.push(myWork);
+        else if (t === 'place') { if (!optional || c.id !== 'retreat') parts.push(places.shift() || '北林'); }
+        else if (!optional) parts.push(fill[t] || '?');
+      }
+      out.push({ cmd: c, example: parts.join(' '), why: c.order ? `长期命令 ${c.order}` : '通用' });
+    }
+    return out;
+  }
+
+  globalThis.AtlasParser = { index, parseSelector, parseCommand, signature, professionOrders, professionCommands, TYPES };
+})();
+
+</script>
+<script>
+// 架构图谱页面逻辑：纯原生 JS，无依赖。
+// 路由：#/<页面>[/<条目>]，条目会在右侧抽屉里打开，可以直接分享链接、浏览器后退。
+(function () {
+  'use strict';
+  const A = globalThis.ATLAS;
+  const P = globalThis.AtlasParser;
+  const IX = P.index(A);
+
+  // ------------------------------------------------------------ 小工具
+  const $ = (s, el) => (el || document).querySelector(s);
+  const $$ = (s, el) => [...(el || document).querySelectorAll(s)];
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const byId = (list, id) => list.find((x) => x.id === id);
+  const mod = (id) => byId(A.modules, id);
+  const prof = (id) => byId(A.professions, id);
+  const layer = (id) => byId(A.layers, id);
+  const comp = (id) => byId(A.components, id);
+  const order = (id) => byId(A.orders, id);
+  const beh = (id) => byId(A.behaviors, id);
+  const cmd = (id) => byId(A.commands, id);
+  const STATUS = { draft: '草案', wip: '开发中', done: '已实现', open: '待定', decided: '已定' };
+  const WHO = { lord: '诸侯', god: '上帝' };
+  const badge = (st) => `<span class="badge st-${esc(st)}">${esc(STATUS[st] || st)}</span>`;
+  const go = (h) => `data-go="${esc(h)}"`;
+
+  const ownerChip = (id) => {
+    if (id === 'engine') return `<span class="chip link" ${go('#/layers/engine')}>🔧 内核</span>`;
+    if (id === 'ai') return `<span class="chip link" ${go('#/layers/ai')}>🤖 AI 层</span>`;
+    const m = mod(id);
+    return m ? `<span class="chip link" ${go('#/modules/' + m.id)}>${m.icon} ${esc(m.name)}</span>` : `<span class="chip">${esc(id)}</span>`;
+  };
+  const profChip = (p) => `<span class="chip link" ${go('#/professions/' + p.id)}><span class="dot" style="background:${p.color}"></span>${esc(p.name)} <span class="dim mono">@${esc(p.short)}</span></span>`;
+  const orderChip = (o) => `<span class="chip link" ${go('#/orders/' + o.id)}>📋 ${esc(o.name)} <span class="dim mono">${esc(o.id)}</span></span>`;
+  const behChip = (b) => `<span class="chip link" ${go('#/behaviors/' + b.id)}>⚙ ${esc(b.name)}</span>`;
+  const compChip = (c) => `<span class="chip link mono" ${go('#/components/' + c.id)}>${esc(c.id)}</span>`;
+  const cmdChip = (c) => `<span class="chip link" ${go('#/commands/' + c.id)}><b style="color:#fcd34d">${esc(c.verb)}</b> <span class="dim mono">${esc(c.id)}</span></span>`;
+  const layerChip = (l) => `<span class="chip link" ${go('#/layers/' + l.id)}><span class="dot" style="background:${l.color}"></span>${esc(l.name)} <span class="dim mono">${esc(l.en)}</span></span>`;
+  const plainChips = (list, mono) => (list || []).map((x) => `<span class="chip${mono ? ' mono' : ''}">${esc(x)}</span>`).join('') || '<span class="dim">—</span>';
+
+  // 命令行着色：动词黄、选择器青
+  function cmdline(text) {
+    const toks = text.split(/\s+/);
+    return `<span class="cmdline">${toks.map((t, i) => (i === 0 ? `<span class="v">${esc(t)}</span>` : /^[@#*]/.test(t) ? `<span class="sel">${esc(t)}</span>` : esc(t))).join(' ')}</span>`;
+  }
+
+  // 极简代码着色
+  function hl(code) {
+    const re = /(\/\/.*$)|('(?:[^'\\]|\\.)*')|(\b\d+(?:\.\d+)?\b)|(\b(?:export|default|const|function|return|interface|type|run)\b)/gm;
+    let out = ''; let last = 0; let m;
+    while ((m = re.exec(code))) {
+      out += esc(code.slice(last, m.index));
+      const cls = m[1] ? 'c' : m[2] ? 's' : m[3] ? 'n' : 'k';
+      out += `<span class="${cls}">${esc(m[0])}</span>`;
+      last = m.index + m[0].length;
+    }
+    return out + esc(code.slice(last));
+  }
+  function lit(v) {
+    if (Array.isArray(v)) return '[' + v.map(lit).join(', ') + ']';
+    if (v && typeof v === 'object') {
+      const ks = Object.keys(v);
+      return ks.length ? '{ ' + ks.map((k) => `${k}: ${lit(v[k])}`).join(', ') + ' }' : '{}';
+    }
+    if (typeof v === 'string') return `'${v.replace(/'/g, "\\'")}'`;
+    return String(v);
+  }
+
+  let toastTimer = 0;
+  function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 1600);
+  }
+  function copy(text) {
+    const done = () => toast('已复制：' + text);
+    const fallback = () => {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { toast('复制失败，请手动选中'); }
+      ta.remove();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
+  }
+
+  // 定时器：换页 / 关抽屉时统一清掉
+  let pageTimers = []; let drawerTimers = [];
+  const every = (bucket, fn, ms) => { const id = setInterval(fn, ms); bucket.push(id); return id; };
+  const clearTimers = (bucket) => { bucket.forEach(clearInterval); bucket.length = 0; };
+  function animateLoop(root, bucket, ms) {
+    $$('.loop', root).forEach((loop) => {
+      const items = $$('span', loop); if (!items.length) return;
+      let i = 0; items[0].classList.add('on');
+      every(bucket, () => { items[i].classList.remove('on'); i = (i + 1) % items.length; items[i].classList.add('on'); }, ms || 900);
+    });
+  }
+
+  // ------------------------------------------------------------ 推导数据
+  const profOrders = (p) => P.professionOrders(p, A);
+  const profsForOrder = (oid) => A.professions.filter((p) => profOrders(p).some((o) => o.id === oid));
+  const behsFor = (p, oid) => A.behaviors.filter((b) => p.behaviors.includes(b.id) && b.fits.includes(oid));
+  const commandsFor = (oid) => A.commands.filter((c) => c.order === oid);
+  const dependents = (mid) => A.modules.filter((m) => m.requires.includes(mid));
+  const layerDependents = (lid) => A.layers.filter((l) => l.deps.includes(lid));
+  const optionalCompsFor = (p) => (p.tags.includes('military') ? ['Combat', 'Equipment'] : []);
+  const SIZE = { f32: 4, u16: 2, u8: 1, id: 4, bool: 1, enum: 1, handle: 4, vec2: 8, blob: 16, string: 4, 'id[]': 8, 'string[]': 8 };
+  const compBytes = (c) => c.fields.reduce((s, f) => s + (SIZE[f[1]] || 4), 0);
+  const baseBytes = A.components.filter((c) => c.base).reduce((s, c) => s + compBytes(c), 0);
+  const statMax = ['speed', 'carry', 'hp', 'attack'].reduce((o, k) => (o[k] = Math.max(...A.professions.map((p) => p.stats[k])), o), {});
+  const STAT_NAME = { speed: '速度', carry: '负重', hp: '血量', attack: '攻击' };
+  const fmtCost = (o) => Object.entries(o || {}).map(([k, v]) => `${k} ${v}`).join('、') || '无';
+  function statBars(p) {
+    return `<div class="bars" style="--pc:${p.color}">${Object.keys(STAT_NAME).map((k) => `<span class="muted">${STAT_NAME[k]}</span><div class="bar"><i style="width:${Math.round((p.stats[k] / statMax[k]) * 100)}%"></i></div><span class="v">${p.stats[k]}</span>`).join('')}</div>`;
+  }
+
+  // ------------------------------------------------------------ 导航
+  const SECTIONS = [
+    { group: '框架' },
+    { id: 'overview', name: '总览', ico: '✦' },
+    { id: 'layers', name: '分层', ico: '▤', cnt: A.layers.length },
+    { id: 'modules', name: '模块', ico: '⬡', cnt: A.modules.length },
+    { id: 'tick', name: '节拍', ico: '⟳' },
+    { group: 'NPC' },
+    { id: 'npc', name: 'NPC 模板', ico: '◉', cnt: A.components.length },
+    { id: 'professions', name: '职业', ico: '⚒', cnt: A.professions.length },
+    { id: 'matrix', name: '行为矩阵', ico: '▦', cnt: A.behaviors.length },
+    { group: '指挥' },
+    { id: 'commands', name: '命令与试验台', ico: '⌘', cnt: A.commands.length },
+    { group: '开发' },
+    { id: 'extend', name: '扩展指南', ico: '＋' },
+    { id: 'roadmap', name: '路线图', ico: '➜' },
+    { id: 'decisions', name: '待定事项', ico: '?', cnt: A.decisions.filter((d) => d.status === 'open').length },
+  ];
+  const PAGE_OF = { components: 'npc', orders: 'matrix', behaviors: 'matrix' };
+
+  function renderNav(active) {
+    $('#nav').innerHTML = `
+      <div class="brand"><div class="brand-logo">诸</div><div><div class="brand-title">${esc(A.meta.title.split(' · ')[0])}</div><div class="brand-sub">架构图谱 · v${esc(A.meta.version)}</div></div></div>
+      ${SECTIONS.map((s) => (s.group ? `<div class="nav-group">${esc(s.group)}</div>`
+        : `<a class="nav-link${s.id === active ? ' active' : ''}" ${go('#/' + s.id)}><span class="ico">${s.ico}</span>${esc(s.name)}${s.cnt != null ? `<span class="cnt">${s.cnt}</span>` : ''}</a>`)).join('')}
+      <div class="nav-foot">数据来源：${esc(A.meta.source)}<br>更新：${esc(A.meta.updated)}<br>改数据后运行 <code>npm run atlas</code></div>`;
+  }
+
+  // ------------------------------------------------------------ 页面
+  const pages = {};
+
+  pages.overview = () => {
+    const stats = [
+      ['layers', A.layers.length, '分层'], ['modules', A.modules.length, '模块'], ['npc', A.components.length, '组件'],
+      ['professions', A.professions.length, '职业'], ['matrix', A.behaviors.length, '行为'], ['commands', A.commands.length, '命令'],
+    ];
+    const cur = A.roadmap.find((r) => r.status === 'wip') || A.roadmap[0];
+    const dots = A.professions.slice(0, 8).map((p, i) => {
+      const y = 30 + (i % 4) * 26; const dur = 4 + (i % 3) * 1.3;
+      return `<circle r="5" fill="${p.color}"><animateMotion dur="${dur}s" begin="${-i * 0.7}s" repeatCount="indefinite" path="M60,${y} C120,${y - 18} 180,${y + 18} 240,${y} C180,${y + 20} 120,${y - 20} 60,${y}"/></circle>`;
+    }).join('');
+    return `
+      <div class="hero">
+        <svg class="hero-units" viewBox="0 0 300 150" aria-hidden="true">
+          <g fill="#166534" opacity=".9"><path d="M30 40 l12 -24 l12 24z"/><path d="M14 70 l12 -24 l12 24z"/><path d="M34 100 l12 -24 l12 24z"/><path d="M12 128 l12 -24 l12 24z"/></g>
+          <rect x="246" y="48" width="44" height="54" rx="6" fill="rgba(124,92,255,.25)" stroke="#a78bfa"/><text x="268" y="80" text-anchor="middle" fill="#c4b5fd" font-size="12">仓</text>
+          ${dots}
+          <circle r="5" fill="#3b82f6"><animateMotion dur="7s" repeatCount="indefinite" path="M80,140 L230,140 L80,140"/></circle>
+          <circle r="5" fill="#3b82f6"><animateMotion dur="7s" begin="-2s" repeatCount="indefinite" path="M80,140 L230,140 L80,140"/></circle>
+        </svg>
+        <div class="row">${badge(cur.status)}<span class="dim mono">v${esc(A.meta.version)} · ${esc(A.meta.updated)}</span></div>
+        <h1>${esc(A.meta.title)}</h1>
+        <p class="lead">${esc(A.meta.subtitle)}</p>
+        <p class="lead" style="font-size:13px">这是 game2 的<b>活文档</b>：框架的每一层、每个模块、每个职业的属性和行为、每条命令都在这里。<br>点任意卡片看详情；在<a class="chip link" ${go('#/commands')}>⌘ 命令试验台</a>里可以直接试写命令。</p>
+        <div class="stats">${stats.map(([id, n, label]) => `<div class="stat" ${go('#/' + id)}><b>${n}</b><span>${label}</span></div>`).join('')}</div>
+      </div>
+      <h2>设计原则 <span class="sub">从旧项目学到的教训</span></h2>
+      <div class="grid g3">${A.principles.map((p) => `<div class="card"><div class="card-title"><span class="pr-ico">${p.icon}</span>${esc(p.title)}</div><div class="card-text">${esc(p.text)}</div></div>`).join('')}</div>
+      <h2>一条命令怎么变成 NPC 干活</h2>
+      ${flowBlock(prof('woodcutter'))}
+      <h2>现在进行到哪</h2>
+      <div class="grid g2">
+        <div class="card click" ${go('#/roadmap')}><div class="card-title">阶段 ${cur.stage} · ${esc(cur.name)} ${badge(cur.status)}</div><div class="card-text">${esc(cur.text)}</div><div class="card-text">🎯 ${esc(cur.goal)}</div></div>
+        <div class="card click" ${go('#/decisions')}><div class="card-title">待你决定 <span class="badge st-open">${A.decisions.filter((d) => d.status === 'open').length} 项</span></div><div class="card-text">${A.decisions.filter((d) => d.status === 'open').slice(0, 4).map((d) => '· ' + esc(d.q)).join('<br>')}</div></div>
+      </div>`;
+  };
+
+  // 命令 → 长期命令 → 行为 → 动作（总览和 NPC 页共用）
+  function flowBlock(p) {
+    const pcs = P.professionCommands(p, A).filter((x) => x.cmd.order);
+    const first = pcs[0];
+    const o = first ? order(first.cmd.order) : order('idle');
+    const bs = behsFor(p, o.id);
+    const main = bs[0] || beh('idle');
+    const loopBehs = [main]; if (p.behaviors.includes('deliver') && main.id !== 'deliver' && o.id === 'work') loopBehs.push(beh('deliver'));
+    const steps = loopBehs.flatMap((b) => b.loop);
+    const acts = [...new Set(loopBehs.flatMap((b) => b.acts))];
+    return `<div class="flow" style="--pc:${p.color}">
+      <div class="step"><div class="dr-kind">① AI 命令</div><h4>${esc(first ? first.cmd.verb : '—')}</h4>${first ? cmdline(first.example) : ''}<div class="muted" style="margin-top:6px">诸侯一次回复可写多行</div></div>
+      <div class="arrow">➜</div>
+      <div class="step"><div class="dr-kind">② 长期命令 Order</div><h4>${esc(o.name)} <span class="dim mono">${esc(o.id)}</span></h4><div class="muted">${o.params.map((x) => `<code>${esc(x)}</code>`).join(' ') || '无参数'}</div><div class="muted" style="margin-top:6px">一个编组共用一条，改它 O(1)</div></div>
+      <div class="arrow">➜</div>
+      <div class="step"><div class="dr-kind">③ 行为（脚本驱动的循环）</div><h4>${loopBehs.map((b) => esc(b.name)).join(' → ')}</h4><div class="loop">${steps.map((s) => `<span>${esc(s)}</span>`).join('')}</div></div>
+      <div class="arrow">➜</div>
+      <div class="step"><div class="dr-kind">④ 动作（规则唯一入口）</div><h4>actions.*</h4><div>${acts.map((a) => `<span class="chip mono">${esc(a)}</span>`).join('')}</div><div class="muted" style="margin-top:6px">返回 { ok, reason }</div></div>
+    </div>`;
+  }
+
+  pages.layers = () => {
+    const L = (id) => layer(id);
+    const row = (l, extra) => `<div class="layer${l.side ? '' : ''}" data-layer="${l.id}" style="--lc:${l.color}" ${go('#/layers/' + l.id)}>
+        <div class="layer-head"><span class="layer-name">${esc(l.name)}</span><span class="layer-en">${esc(l.en)}</span><span class="spacer"></span>${badge(l.status)}</div>
+        <div class="layer-role">${esc(l.role)}</div>${extra || ''}</div>`;
+    const band = (l) => `<div class="layer band" data-layer="${l.id}" style="--lc:${l.color}" ${go('#/layers/' + l.id)}><span class="layer-name">⇅ ${esc(l.name)}</span> <span class="layer-en">${esc(l.en)} · WebSocket · 前后端共用类型</span></div>`;
+    const mods = `<div class="mods">${A.modules.map((m) => `<span class="chip link" ${go('#/modules/' + m.id)}>${m.icon} ${esc(m.name)}</span>`).join('')}</div>`;
+    return `
+      <h1>分层</h1>
+      <p class="lead">依赖<b>只能向下</b>。把鼠标放到某一层上，会高亮它依赖的层；点开看这一层管什么、放在哪个目录。</p>
+      <div class="stack" style="margin-top:18px">
+        <div class="stack-main">
+          ${row(L('client'))}${band(L('protocol'))}${row(L('server'))}${row(L('ai'))}${row(L('game'), mods)}${row(L('engine'))}${row(L('shared'))}
+        </div>
+        <div class="stack-side">
+          ${row(L('content'))}
+          <div class="rule">📏 <b>规则由测试守着</b><br>向上依赖、绕过模块公开接口（index.ts）都会让 <code>npm test</code> 失败（dependency-cruiser）。</div>
+          <div class="rule">🌐 <b>前端只认通信格式</b><br>client 只依赖 protocol 和 shared，绝不碰模拟代码；模拟可以不开画面加速跑。</div>
+          <div class="rule">📦 <b>一个 package.json</b><br>不拆多包，层次靠目录 + 依赖检查。</div>
+        </div>
+      </div>`;
+  };
+  pages.layers.mount = (root) => {
+    $$('.layer', root).forEach((el) => {
+      el.addEventListener('mouseenter', () => {
+        const l = layer(el.dataset.layer); const keep = new Set([l.id, ...l.deps]);
+        $$('.layer', root).forEach((x) => { x.classList.toggle('hl', keep.has(x.dataset.layer) && x !== el); x.classList.toggle('dimmed', !keep.has(x.dataset.layer)); });
+      });
+      el.addEventListener('mouseleave', () => $$('.layer', root).forEach((x) => x.classList.remove('hl', 'dimmed')));
+    });
+  };
+
+  pages.modules = () => {
+    const depth = {}; const d = (id) => (depth[id] != null ? depth[id] : (depth[id] = mod(id).requires.length ? 1 + Math.max(...mod(id).requires.map(d)) : 0));
+    A.modules.forEach((m) => d(m.id));
+    const cols = []; A.modules.forEach((m) => (cols[depth[m.id]] = cols[depth[m.id]] || []).push(m));
+    const W = 160, H = 56, GX = 46, GY = 18, PAD = 16;
+    const pos = {};
+    cols.forEach((col, ci) => col.forEach((m, ri) => (pos[m.id] = { x: PAD + ci * (W + GX), y: PAD + ri * (H + GY) })));
+    const svgW = PAD * 2 + cols.length * W + (cols.length - 1) * GX;
+    const svgH = PAD * 2 + Math.max(...cols.map((c) => c.length)) * (H + GY) - GY;
+    const edges = A.modules.flatMap((m) => m.requires.map((r) => {
+      const a = pos[r], b = pos[m.id]; const x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x, y2 = b.y + H / 2; const mx = (x1 + x2) / 2;
+      return `<path class="edge" data-from="${r}" data-to="${m.id}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" marker-end="url(#arr)"/>`;
+    })).join('');
+    const count = (m) => ['components', 'systems', 'actions', 'orders', 'events', 'briefing', 'views'].reduce((s, k) => s + (m[k] || []).length, 0)
+      + A.behaviors.filter((b) => b.module === m.id).length + A.commands.filter((c) => c.module === m.id).length;
+    const nodes = A.modules.map((m) => { const p = pos[m.id]; return `<g class="node" data-id="${m.id}" ${go('#/modules/' + m.id)} transform="translate(${p.x},${p.y})">
+        <rect width="${W}" height="${H}" rx="12"/><text x="12" y="23">${m.icon} ${esc(m.name)} <tspan class="sm" dx="3">${esc(m.id)}</tspan></text>
+        <text class="sm" x="12" y="42">阶段 ${m.stage} · 登记 ${count(m)} 项</text></g>`; }).join('');
+    const contractCode = 'export interface GameModule {\n' + A.contract.map((c) => `  ${c.field}${['id'].includes(c.field) ? '' : '?'}: ${c.type};`.padEnd(40) + ` // ${c.desc}`).join('\n') + '\n}';
+    return `
+      <h1>模块</h1>
+      <p class="lead">一个玩法 = 一个模块文件夹。箭头从被依赖的模块指向依赖它的模块；悬停高亮关系，点开看它向核心登记了什么。</p>
+      <div class="graph-wrap" style="margin-top:16px"><svg class="graph" viewBox="0 0 ${svgW} ${svgH}" style="width:100%;min-width:900px;height:auto">
+        <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="rgba(167,139,250,.7)"/></marker></defs>
+        ${edges}${nodes}</svg></div>
+      <h2>全部模块</h2>
+      <div class="grid g3">${A.modules.map((m) => `<div class="card click" ${go('#/modules/' + m.id)}>
+        <div class="card-title">${m.icon} ${esc(m.name)} <span class="dim mono">${esc(m.id)}</span><span class="spacer"></span>${badge(m.status)}</div>
+        <div class="card-text">${esc(m.summary)}</div>
+        <div class="card-text">依赖：${m.requires.length ? m.requires.map((r) => esc(mod(r).name)).join('、') : '无'} · 阶段 ${m.stage}</div></div>`).join('')}</div>
+      <h2>模块契约 <span class="sub">GameModule：模块能向核心登记的全部东西，用不到的不填</span></h2>
+      <pre class="code">${hl(contractCode)}</pre>
+      <p class="lead" style="margin-top:10px">启动时注册表会：按 requires 排序 → 检查 ID 和命令名重复 → 把系统按阶段排好 → 汇总命令生成解析器和 AI 命令表。<b>任何一项不合规，启动直接报错。</b></p>`;
+  };
+  pages.modules.mount = (root) => {
+    $$('.node', root).forEach((n) => {
+      n.addEventListener('mouseenter', () => {
+        const id = n.dataset.id; const rel = new Set([id]);
+        $$('.edge', root).forEach((e) => { const on = e.dataset.from === id || e.dataset.to === id; e.classList.toggle('hl', on); e.classList.toggle('dim', !on); if (on) { rel.add(e.dataset.from); rel.add(e.dataset.to); } });
+        $$('.node', root).forEach((x) => x.classList.toggle('dim', !rel.has(x.dataset.id)));
+      });
+      n.addEventListener('mouseleave', () => { $$('.edge,.node', root).forEach((x) => x.classList.remove('hl', 'dim')); });
+    });
+  };
+
+  pages.tick = () => `
+    <h1>节拍</h1>
+    <p class="lead">模拟按固定节拍运行：<b>每秒 ${A.tick.hz} 次</b>。画面照常每秒 60 帧，两次快照之间由前端补帧。每个系统声明自己在哪个阶段、多久跑一次（每拍 / 每 10 拍 / 每游戏日）。</p>
+    <div class="pipe" style="margin-top:18px">${A.tick.phases.map((ph, i) => `<div class="ph" data-i="${i}"><span class="no">${i + 1}</span><b>${esc(ph.name)}</b><div class="muted">${esc(ph.text)}</div></div>`).join('')}</div>
+    <h2>各模块的系统</h2>
+    <div class="card"><table class="t"><tr><th>模块</th><th>系统</th></tr>${A.modules.filter((m) => (m.systems || []).length).map((m) => `<tr class="click" ${go('#/modules/' + m.id)}><td>${m.icon} ${esc(m.name)}</td><td>${plainChips(m.systems)}</td></tr>`).join('')}</table></div>
+    <h2>可重现</h2>
+    <div class="grid g3">
+      <div class="card"><div class="card-title">🎲 只用带种子的随机数</div><div class="card-text">模拟代码里禁用 Math.random / Date.now（ESLint 拦住），随机数一律走 shared/rng。</div></div>
+      <div class="card"><div class="card-title">📼 命令记录 = 复盘文件</div><div class="card-text">所有命令都走同一条总线。同一个种子 + 同样的命令记录，结果逐字节相同。</div></div>
+      <div class="card"><div class="card-title">⏩ 不开画面也能跑</div><div class="card-text">模拟和画面彻底分开：测试、快进、长跑都在后端直接跑。</div></div>
+    </div>`;
+  pages.tick.mount = (root) => {
+    const phs = $$('.ph', root); let i = 0;
+    every(pageTimers, () => { phs.forEach((p) => p.classList.remove('pulse')); phs[i].classList.add('pulse'); i = (i + 1) % phs.length; }, 420);
+  };
+
+  pages.npc = () => {
+    const card = (c) => `<div class="card click comp-card" ${go('#/components/' + c.id)}>
+      <div class="card-title"><code style="color:#c4b5fd">${esc(c.id)}</code> ${esc(c.name)}<span class="spacer"></span>${ownerChip(c.owner)}</div>
+      <div class="fields">${c.fields.map((f) => `<div><code>${esc(f[0])}</code><span class="ty">${esc(f[1])}</span><span class="muted">${esc(f[2])}</span></div>`).join('')}</div></div>`;
+    return `
+      <h1>NPC 通用模板</h1>
+      <p class="lead">每个 NPC 只是一个<b>实体 ID</b>，数据按"列"放在紧凑数组里（不是场景节点）。所有 NPC 都有下面这组基础组件；职业只是一份数据，决定数值和能做的行为。</p>
+      <div class="row" style="margin:12px 0 4px"><span class="chip">基础组件约 <b>&nbsp;${baseBytes}&nbsp;</b> 字节 / 人</span><span class="chip">2000 人 ≈ ${(baseBytes * 2000 / 1024).toFixed(0)} KB</span><span class="chip">村民规格：只拿一种东西、不单独吃饭</span></div>
+      <h2>基础组件 <span class="sub">每个 NPC 都有</span></h2>
+      <div class="grid g3">${A.components.filter((c) => c.base).map(card).join('')}</div>
+      <h2>可选组件 <span class="sub">按需挂；以后的模块可以随时加新组件</span></h2>
+      <div class="grid g3">${A.components.filter((c) => !c.base).map(card).join('')}</div>
+      <h2>命令 → 行为 → 动作 <span class="sub">选一个职业看看</span></h2>
+      <div class="row" id="flowPick">${A.professions.map((p, i) => `<span class="chip link" data-flow="${p.id}" style="${p.id === 'woodcutter' ? 'border-color:' + p.color : ''}"><span class="dot" style="background:${p.color}"></span>${esc(p.name)}</span>`).join('')}</div>
+      <div id="flowBox" style="margin-top:12px">${flowBlock(prof('woodcutter'))}</div>
+      <p class="lead" style="margin-top:12px">每一层只管一件事：<b>命令</b>改长期命令，<b>长期命令</b>被一个编组共用，NPC 空闲时按命令和职业挑<b>行为</b>，行为每一步调用<b>动作</b>。动作是改世界的唯一入口。</p>`;
+  };
+  pages.npc.mount = (root) => {
+    animateLoop(root, pageTimers);
+    $$('[data-flow]', root).forEach((el) => el.addEventListener('click', () => {
+      clearTimers(pageTimers);
+      $$('[data-flow]', root).forEach((x) => x.style.borderColor = '');
+      el.style.borderColor = prof(el.dataset.flow).color;
+      $('#flowBox', root).innerHTML = flowBlock(prof(el.dataset.flow));
+      animateLoop(root, pageTimers);
+    }));
+  };
+
+  let profFilter = 'all';
+  pages.professions = () => {
+    const tags = [...new Set(A.professions.flatMap((p) => p.tags))];
+    const list = A.professions.filter((p) => profFilter === 'all' || p.tags.includes(profFilter));
+    return `
+      <h1>职业</h1>
+      <p class="lead">加一个职业通常只加一份数据。点开任意职业，看它的<b>全部属性、行为和能用的控制命令</b>。</p>
+      <div class="filters"><div class="seg">${['all', ...tags].map((t) => `<button data-pf="${t}" class="${profFilter === t ? 'on' : ''}">${t === 'all' ? '全部' : t === 'worker' ? '干活的 @worker' : t === 'military' ? '军事 @military' : t}</button>`).join('')}</div></div>
+      <div class="grid g4">${list.map((p) => `<div class="card click prof-card" style="--pc:${p.color}" ${go('#/professions/' + p.id)}>
+        <div class="row"><div class="avatar">${esc(p.short)}</div><div><div class="card-title">${esc(p.name)}</div><div class="dim mono" style="font-size:12px">@${esc(p.short)} · ${esc(p.id)}</div></div><span class="spacer"></span>${badge(p.status)}</div>
+        ${statBars(p)}
+        <div class="card-text">默认：${esc(p.defaultOrder)} · 口粮 ${esc(fmtCost(p.upkeep))}</div>
+        <div style="margin-top:6px">${p.tags.map((t) => `<span class="chip mono">@${esc(t)}</span>`).join('')}</div></div>`).join('')}</div>`;
+  };
+  pages.professions.mount = (root) => {
+    $$('[data-pf]', root).forEach((b) => b.addEventListener('click', () => { profFilter = b.dataset.pf; renderPage('professions', true); }));
+  };
+
+  pages.matrix = () => `
+    <h1>行为矩阵</h1>
+    <p class="lead">行是职业，列是长期命令；格子里是"这个职业靠哪个行为完成这条命令"。空格表示接不了：给伐木工下"攻"，执行时会被跳过并在结果里说明。</p>
+    <div class="matrix" style="margin-top:16px"><table>
+      <tr><th style="text-align:left">职业 \\ 长期命令</th>${A.orders.map((o) => `<th ${go('#/orders/' + o.id)}>${esc(o.name)}<br><span class="dim mono" style="font-weight:400">${esc(o.id)}</span></th>`).join('')}</tr>
+      ${A.professions.map((p) => `<tr><td class="rowh" ${go('#/professions/' + p.id)}><span class="chip"><span class="dot" style="background:${p.color}"></span>${esc(p.name)}</span></td>${A.orders.map((o) => {
+        const bs = behsFor(p, o.id);
+        const plus = o.id === 'work' && bs.length && p.behaviors.includes('deliver') ? ` <span class="dim" ${go('#/behaviors/deliver')}>+ 送回</span>` : '';
+        return bs.length ? `<td class="yes" style="--pc:${p.color}">${bs.map((b) => `<span ${go('#/behaviors/' + b.id)}>${esc(b.name)}</span>`).join(' / ')}${plus}</td>` : '<td class="no">·</td>';
+      }).join('')}</tr>`).join('')}
+    </table></div>
+    <h2>全部行为</h2>
+    <div class="grid g3">${A.behaviors.map((b) => `<div class="card click" ${go('#/behaviors/' + b.id)}>
+      <div class="card-title">⚙ ${esc(b.name)} <span class="dim mono">${esc(b.id)}</span><span class="spacer"></span>${ownerChip(b.module)}</div>
+      <div class="card-text">${esc(b.text)}</div>
+      <div class="card-text">完成：${b.support ? '辅助行为（跟在别的行为后面）' : b.fits.map((f) => (f === '*' ? '任何命令（兜底）' : esc(order(f).name))).join('、')}</div></div>`).join('')}</div>`;
+
+  // ---------------- 命令页
+  const pg = { text: '派 @木:5 伐木 北林', who: 'lord' };
+  let cmdFilter = { who: 'all', q: '' };
+  pages.commands = () => {
+    const sampleLines = ['派 @木:5 伐木 北林', '比例 青石城 农50 木20 石10 兵20', '编 @兵@青石城:20 一队', '攻 #一队 赤焰.河口镇', '转 @农:30% 兵', '攻 @木:5 赤焰.河口镇', '信 赤焰 北林归你，河口归我，如何？', '派 @木 伐木 火星'];
+    const w = A.sampleWorld;
+    return `
+      <h1>命令与试验台</h1>
+      <p class="lead">命令 = <b>动词 + 选择器 + 参数</b>，一行一条。每条命令只定义一次：解析器、AI 命令表、上帝面板按钮、文档、契约测试都由同一份定义生成。</p>
+      <div class="playground" style="margin-top:16px">
+        <div class="row" style="margin-bottom:10px"><b>⌘ 命令试验台</b><span class="dim">用和游戏同一套语法实时解析（示例世界：你是 ${esc(w.me)}，城镇 ${w.myTowns.map(esc).join('、')}）</span></div>
+        <div class="pg-input"><input id="pgInput" value="${esc(pg.text)}" spellcheck="false" autocomplete="off"><div class="seg"><button data-who="lord" class="${pg.who === 'lord' ? 'on' : ''}">诸侯</button><button data-who="god" class="${pg.who === 'god' ? 'on' : ''}">上帝</button></div></div>
+        <div class="pg-sig" id="pgSig"></div>
+        <div class="pg-out" id="pgOut"></div>
+        <div class="pg-ex">${sampleLines.map((l) => `<span class="chip link" data-try="${esc(l)}">${esc(l)}</span>`).join('')}</div>
+      </div>
+      <h2>选择器速查 <span class="sub">选中哪些 NPC；点一下放进试验台</span></h2>
+      <div class="card"><table class="t">${A.selectors.map((s) => `<tr><td style="width:200px">${s.syntax.split(' / ').map((x) => `<span class="chip link mono" data-sel="${esc(x)}">${esc(x)}</span>`).join('')}</td><td class="muted">${esc(s.meaning)}</td></tr>`).join('')}</table>
+        <div class="card-text" style="margin-top:8px">选择器只能选到<b>自己势力</b>的 NPC，由命令总线统一校验。两种指挥方式并存：<b>比例</b>（系统自动分配空闲的人）和<b>直接派</b>（被派的人锁定，"放"才解除）。</div></div>
+      <h2>全部命令</h2>
+      <div class="filters"><div class="seg">${[['all', '全部'], ['lord', '诸侯'], ['god', '上帝']].map(([k, n]) => `<button data-cw="${k}" class="${cmdFilter.who === k ? 'on' : ''}">${n}</button>`).join('')}</div><input id="cmdQ" placeholder="筛选：动词、说明、ID…" value="${esc(cmdFilter.q)}"></div>
+      <div id="cmdList">${commandList()}</div>
+      <h2>AI 看到的命令表 <span class="sub">由命令定义自动生成，插进提示词</span></h2>
+      <details class="card"><summary style="cursor:pointer">展开预览</summary><pre class="code" style="margin-top:12px">${esc(aiCommandTable())}</pre></details>`;
+  };
+  function commandList() {
+    const q = cmdFilter.q.trim().toLowerCase();
+    const groups = ['jobs', 'building', 'military', 'population', 'diplomacy', 'ai', 'god'];
+    return groups.map((g) => {
+      const list = A.commands.filter((c) => c.module === g && (cmdFilter.who === 'all' || c.who.includes(cmdFilter.who)) && (!q || (c.verb + c.id + c.help + c.examples.join(' ')).toLowerCase().includes(q)));
+      if (!list.length) return '';
+      return `<h3>${ownerChip(g)}</h3><div class="card" style="padding:4px 8px"><table class="t">${list.map((c) => `<tr class="click cmd-row" ${go('#/commands/' + c.id)}>
+        <td><span class="verb">${esc(c.verb)}</span></td>
+        <td><code class="muted">${esc(P.signature(c))}</code><div class="muted" style="font-size:12.5px">${esc(c.help)}</div></td>
+        <td style="text-align:right;white-space:nowrap">${c.order ? `<span class="chip mono">→ ${esc(c.order)}</span>` : ''}${c.who.map((x) => `<span class="badge st-${x === 'god' ? 'open' : 'draft'}">${WHO[x]}</span>`).join(' ')}</td></tr>`).join('')}</table></div>`;
+    }).join('') || '<p class="muted">没有匹配的命令</p>';
+  }
+  function aiCommandTable() {
+    const lines = ['【命令】每行一条：动词 选择器 参数。<必填> [可省略]', ''];
+    lines.push('选择器：' + A.selectors.map((s) => `${s.syntax.split(' / ')[0]}=${s.meaning}`).join('；'), '');
+    for (const g of ['jobs', 'building', 'military', 'population', 'diplomacy', 'ai']) {
+      const list = A.commands.filter((c) => c.module === g && c.who.includes('lord'));
+      if (!list.length) continue;
+      lines.push(`# ${g === 'ai' ? '心里话' : mod(g).name}`);
+      list.forEach((c) => lines.push(`${P.signature(c)}  —— ${c.help}。例：${c.examples[0]}`));
+      lines.push('');
+    }
+    return lines.join('\n');
+  }
+  function renderPlayground(root) {
+    const out = $('#pgOut', root); const sig = $('#pgSig', root);
+    const text = pg.text.trim();
+    const verb = text.split(/\s+/)[0] || '';
+    const c = IX.cmds.get(verb);
+    sig.innerHTML = c ? `格式：<b style="color:#e6e9f2">${esc(P.signature(c))}</b> · ${esc(c.help)}` : text ? '输入动词开头，例如：派、攻、比例、编…' : '';
+    if (!text) { out.innerHTML = ''; return; }
+    const r = P.parseCommand(text, A, { ix: IX, who: pg.who });
+    if (!r.ok) {
+      out.innerHTML = `<div class="pg-err"><b>✗ ${esc(r.error)}</b>${r.hint ? `<div class="muted" style="margin-top:4px">💡 ${esc(r.hint)}</div>` : ''}</div>`;
+      return;
+    }
+    const o = r.cmd.order ? order(r.cmd.order) : null;
+    const warns = [...(r.warns || [])];
+    if (o) {
+      for (const a of r.args.filter((x) => x.type === 'sel' && Array.isArray(x.raw))) {
+        for (const part of a.raw) {
+          if (part.kind === 'prof') {
+            const p = prof(part.prof);
+            if (!profOrders(p).some((x) => x.id === o.id)) warns.push(`${p.name}接不了"${o.name}"（没有能完成它的行为），执行时这些人会被跳过并在结果里说明`);
+          }
+        }
+      }
+    }
+    out.innerHTML = `<div class="pg-ok"><div class="row"><b style="color:#6ee7b7">✓ 解析成功</b>${cmdChip(r.cmd)}${ownerChip(r.cmd.module)}${o ? `<span class="muted">→ 生成长期命令</span>${orderChip(o)}` : ''}</div>
+      <div style="margin-top:8px">${r.args.map((a) => `<div class="pg-arg"><b>${esc(a.name)}</b><span class="ty">${esc(a.typeName)}</span><span>${a.skipped ? '<span class="dim">（省略）</span>' : esc(a.show)}</span></div>`).join('')}</div></div>
+      ${warns.map((w) => `<div class="pg-err" style="border-color:rgba(251,191,36,.4);background:rgba(251,191,36,.07)">⚠ ${esc(w)}</div>`).join('')}`;
+  }
+  pages.commands.mount = (root) => {
+    const input = $('#pgInput', root);
+    input.addEventListener('input', () => { pg.text = input.value; renderPlayground(root); });
+    $$('[data-who]', root).forEach((b) => b.addEventListener('click', () => { pg.who = b.dataset.who; $$('[data-who]', root).forEach((x) => x.classList.toggle('on', x === b)); renderPlayground(root); }));
+    $$('[data-sel]', root).forEach((s) => s.addEventListener('click', () => {
+      const t = pg.text.trim().split(/\s+/); const verb = t[0] && IX.cmds.get(t[0]) ? t[0] : '派';
+      pg.text = verb === '派' ? `派 ${s.dataset.sel} 伐木 北林` : `${verb} ${s.dataset.sel}`; input.value = pg.text; renderPlayground(root); input.focus();
+    }));
+    $$('[data-cw]', root).forEach((b) => b.addEventListener('click', () => { cmdFilter.who = b.dataset.cw; $$('[data-cw]', root).forEach((x) => x.classList.toggle('on', x === b)); $('#cmdList', root).innerHTML = commandList(); }));
+    $('#cmdQ', root).addEventListener('input', (e) => { cmdFilter.q = e.target.value; $('#cmdList', root).innerHTML = commandList(); });
+    renderPlayground(root);
+  };
+
+  pages.extend = () => `
+    <h1>扩展指南</h1>
+    <p class="lead">以后加东西，照着做就行。原则：<b>核心文件不用改</b>，新东西都通过模块登记。</p>
+    <div class="grid g2" style="margin-top:16px">${A.recipes.map((r) => `<div class="card"><div class="card-title">${esc(r.title)}</div>
+      <ol style="margin:8px 0 0;padding-left:20px;color:var(--muted);font-size:13px">${r.steps.map((s) => `<li style="margin:3px 0">${esc(s)}</li>`).join('')}</ol>
+      ${r.note ? `<div class="card-text">💡 ${esc(r.note)}</div>` : ''}</div>`).join('')}</div>
+    <h2>测试与守门 <span class="sub">npm test 一条命令跑全部</span></h2>
+    <div class="grid g3">${A.gates.map((g) => `<div class="card"><div class="card-title">✅ ${esc(g.name)}</div><div class="card-text">${esc(g.text)}</div></div>`).join('')}</div>
+    <h2>维护这个页面</h2>
+    <div class="card">
+      <div class="kv"><span class="k2">现在</span><span>手工维护 <code>atlas/data.js</code>，和 docs/ 里的设计文档保持一致</span>
+      <span class="k2">以后</span><span><code>npm run atlas:export</code> 从代码里的模块注册表导出已实现的部分（状态"已实现"），没实现的继续留在 data.js（"草案/开发中"）</span>
+      <span class="k2">每次改完</span><span><code>npm run atlas</code>：校验（引用完整、命令例子都能解析、能力事实）→ 生成单文件 <code>docs/atlas.html</code></span>
+      <span class="k2">本地预览</span><span><code>npm run atlas:serve</code>，浏览器打开 http://localhost:8080</span></div>
+    </div>`;
+
+  pages.roadmap = () => `
+    <h1>路线图</h1>
+    <p class="lead">每个阶段都带测试和压测，单独提交。<b>第 3 阶段结束是第一个关键验收点</b>：用真实模型跑一局，看冲突够不够、好不好看。</p>
+    <div class="timeline" style="margin-top:18px">${A.roadmap.map((r) => `<div class="tl-item ${r.status}"><div class="card">
+      <div class="card-title">阶段 ${r.stage} · ${esc(r.name)} ${badge(r.status)}</div>
+      <div class="card-text">${esc(r.text)}</div><div class="card-text">🎯 ${esc(r.goal)}</div>
+      <div style="margin-top:6px">${A.modules.filter((m) => m.stage === r.stage).map((m) => `<span class="chip link" ${go('#/modules/' + m.id)}>${m.icon} ${esc(m.name)}</span>`).join('')}</div></div></div>`).join('')}</div>`;
+
+  pages.decisions = () => `
+    <h1>待定事项</h1>
+    <p class="lead">需要你拍板的问题。定下来后会改成"已定"，并同步到设计文档。</p>
+    <div class="card" style="margin-top:16px;padding:6px 10px"><table class="t"><tr><th>问题</th><th>建议</th><th style="width:80px">状态</th></tr>
+      ${A.decisions.map((d) => `<tr><td>${esc(d.q)}</td><td class="muted">${esc(d.proposal)}</td><td>${badge(d.status)}</td></tr>`).join('')}</table></div>`;
+
+  // ------------------------------------------------------------ 抽屉
+  const drawers = {};
+
+  drawers.layers = (l) => {
+    const deps = l.deps.map(layer); const users = layerDependents(l.id);
+    let extra = '';
+    if (l.id === 'game') extra = `<h3>模块（${A.modules.length}）</h3>${A.modules.map((m) => `<span class="chip link" ${go('#/modules/' + m.id)}>${m.icon} ${esc(m.name)}</span>`).join('')}`;
+    if (l.id === 'engine') extra = `<h3>内核负责的组件</h3>${A.components.filter((c) => c.owner === 'engine').map(compChip).join('')}<h3>内核动作</h3><span class="chip mono">moveTo</span><span class="chip mono">wait</span>`;
+    if (l.id === 'ai') extra = `<h3>AI 层的命令</h3>${A.commands.filter((c) => c.module === 'ai').map(cmdChip).join('')}`;
+    if (l.id === 'content') extra = `<h3>职业数据（${A.professions.length}）</h3>${A.professions.map(profChip).join('')}`;
+    return { kind: '分层', title: `<span class="dot" style="width:14px;height:14px;border-radius:5px;background:${l.color};display:inline-block"></span>${esc(l.name)} <span class="dim mono" style="font-size:15px">${esc(l.en)}</span>`, sub: badge(l.status),
+      body: `<p>${esc(l.role)}</p>
+        <div class="kv"><span class="k2">目录</span><span>${l.dirs.map((d) => `<code>${esc(d)}</code>`).join(' ')}</span>
+        <span class="k2">包含</span><span>${plainChips(l.items, true)}</span>
+        <span class="k2">依赖</span><span>${deps.map(layerChip).join('') || '<span class="dim">无（最底层）</span>'}</span>
+        <span class="k2">被依赖</span><span>${users.map(layerChip).join('') || '<span class="dim">无</span>'}</span></div>${extra}` };
+  };
+
+  drawers.modules = (m) => {
+    const behs = A.behaviors.filter((b) => b.module === m.id);
+    const cmds = A.commands.filter((c) => c.module === m.id);
+    const sec = (title, html) => `<h3>${title}</h3><div class="contrib">${html}</div>`;
+    const files = ['index.ts'];
+    if ((m.components || []).length) files.push('components.ts');
+    if ((m.systems || []).length) files.push('systems/');
+    if ((m.actions || []).length) files.push('actions.ts');
+    if ((m.orders || []).length) files.push('orders.ts');
+    if (behs.length) files.push('behaviors/');
+    if (cmds.length) files.push('commands.ts');
+    if ((m.events || []).length) files.push('events.ts');
+    if ((m.briefing || []).length) files.push('briefing.ts');
+    if ((m.views || []).length) files.push('views.ts');
+    if (m.config) files.push('config.ts');
+    if (m.save) files.push('save.ts');
+    files.push('tests/');
+    const tree = `src/game/modules/${m.id}/\n` + files.map((f, i) => `${i === files.length - 1 ? '└─' : '├─'} ${f}`).join('\n');
+    return { kind: '模块', title: `${m.icon} ${esc(m.name)} <span class="dim mono" style="font-size:15px">${esc(m.id)}</span>`, sub: `${badge(m.status)} <span class="dim">阶段 ${m.stage}</span>`,
+      body: `<p>${esc(m.summary)}</p>
+        <div class="kv"><span class="k2">依赖</span><span>${m.requires.map(ownerChip).join('') || '<span class="dim">无</span>'}</span>
+        <span class="k2">被依赖</span><span>${dependents(m.id).map((x) => ownerChip(x.id)).join('') || '<span class="dim">无</span>'}</span></div>
+        ${sec('组件 components', (m.components || []).map((c) => compChip(comp(c))).join('') || '<span class="dim">—</span>')}
+        ${sec('长期命令 orders', (m.orders || []).map((o) => orderChip(order(o))).join('') || '<span class="dim">—</span>')}
+        ${sec('行为 behaviors', behs.map(behChip).join('') || '<span class="dim">—</span>')}
+        ${sec('命令 commands', cmds.map(cmdChip).join('') || '<span class="dim">—</span>')}
+        ${sec('动作 actions', plainChips(m.actions, true))}
+        ${sec('系统 systems', plainChips(m.systems))}
+        ${sec('事件 events', plainChips(m.events, true))}
+        ${sec('唤醒 AI 的事件 wake', plainChips(m.wake, true))}
+        ${sec('AI 简报段落 briefing', plainChips(m.briefing))}
+        ${sec('前端数据通道 views', plainChips(m.views, true))}
+        ${sec('内容数据 content', plainChips(m.content, true))}
+        ${sec('配置 config', plainChips(m.config))}
+        ${sec('存档 save', m.save ? `<span class="chip">${esc(m.save)}</span>` : '<span class="dim">—</span>')}
+        <h3>文件夹（规划）</h3><pre class="code">${esc(tree)}</pre>` };
+  };
+
+  drawers.professions = (p) => {
+    const orders = profOrders(p);
+    const pcs = P.professionCommands(p, A);
+    const mainSteps = [beh(p.behaviors[0])].concat(p.behaviors.includes('deliver') && p.behaviors[0] !== 'deliver' ? [beh('deliver')] : []).flatMap((b) => b.loop);
+    const comps = A.components.filter((c) => c.base).map(compChip).join('') + optionalCompsFor(p).map((id) => compChip(comp(id))).join('');
+    const code = `// content/professions/${p.id}.ts\nexport default defineProfession({\n  id: '${p.id}', name: '${p.name}', short: '${p.short}',\n  tags: ${lit(p.tags)},\n  stats: ${lit(p.stats)},\n  behaviors: ${lit(p.behaviors)},\n  defaultOrder: '${p.defaultOrder}',\n  tools: ${lit(p.tools)},\n  upkeep: ${lit(p.upkeep)},\n  train: ${lit(p.train)},\n});`;
+    return { kind: '职业', title: `<div class="avatar lg" style="--pc:${p.color}">${esc(p.short)}</div><div>${esc(p.name)}<div class="dim mono" style="font-size:13px;font-weight:400">@${esc(p.short)} · ${esc(p.id)}</div></div>`,
+      sub: `${badge(p.status)} ${p.tags.map((t) => `<span class="chip mono">@${esc(t)}</span>`).join('')}`,
+      body: `<p>${esc(p.text)}</p>
+        <h3>属性</h3>${statBars(p)}
+        <div class="kv" style="margin-top:12px"><span class="k2">默认命令</span><span>${esc(p.defaultOrder)}</span>
+        <span class="k2">工具加成</span><span>${Object.keys(p.tools).length ? Object.entries(p.tools).map(([k, v]) => `<span class="chip">${esc(k)} ×${v}</span>`).join('') : '<span class="dim">无</span>'}</span>
+        <span class="k2">每天口粮</span><span>${esc(fmtCost(p.upkeep))}</span>
+        <span class="k2">转职成本</span><span>${esc(fmtCost(p.train.cost))} · ${p.train.days} 天</span></div>
+        <h3>干活循环</h3><div class="loop" style="--pc:${p.color}">${mainSteps.map((s) => `<span>${esc(s)}</span>`).join('')}</div>
+        <h3>行为（按优先级）</h3>
+        <table class="t">${p.behaviors.map((id, i) => { const b = beh(id); return `<tr class="click" ${go('#/behaviors/' + b.id)}><td style="width:28px" class="dim mono">${i + 1}</td><td>⚙ ${esc(b.name)} <span class="dim mono">${esc(b.id)}</span></td><td class="muted">${b.support ? '辅助' : b.fits.map((f) => (f === '*' ? '兜底' : esc(order(f).name))).join('、')}</td></tr>`; }).join('')}</table>
+        <h3>能接的长期命令</h3>${orders.map(orderChip).join('')}
+        <h3>控制命令（${pcs.length}）</h3>
+        <div>${pcs.map((x) => `<div class="ex-row">${cmdline(x.example)}<button class="btn sm" data-copy="${esc(x.example)}">复制</button><button class="btn sm" data-try="${esc(x.example)}">试一试</button><span class="why">${esc(x.cmd.help.split('，')[0].split('（')[0])}</span></div>`).join('')}</div>
+        <div class="card-text">选择器还可以写成 <code>@${esc(p.short)}@青石城</code>（限定城镇）、<code>@${esc(p.short)}:30%</code>（按比例）、<code>@${esc(p.tags[0])}</code>（按标签）。</div>
+        <h3>组件</h3>${comps}
+        <h3>数据定义</h3><pre class="code">${hl(code)}</pre>` };
+  };
+
+  drawers.commands = (c) => {
+    const o = c.order ? order(c.order) : null;
+    const ps = o ? profsForOrder(o.id) : [];
+    const argsCode = c.args.map(([n, t]) => (n.endsWith('?') ? `${t}('${n.replace('?', '')}', { optional: true })` : `${t}('${n}')`)).join(', ');
+    const code = `export const ${c.id}: CommandDef = {\n  id: '${c.id}', verb: '${c.verb}', module: '${c.module}',\n  who: ${lit(c.who)},\n  args: [${argsCode}],${o ? `\n  order: '${o.id}',` : ''}\n  help: '${c.help}',\n  examples: ${lit(c.examples)},\n  run(ctx, args) { /* 校验 → 执行（写长期命令 / 调动作）→ 返回结果 */ },\n};`;
+    return { kind: '命令', title: `<span class="verb" style="font-size:28px">${esc(c.verb)}</span> <span class="dim mono" style="font-size:15px">${esc(c.id)}</span>`,
+      sub: `${ownerChip(c.module)} ${c.who.map((x) => `<span class="badge st-${x === 'god' ? 'open' : 'draft'}">${WHO[x]}</span>`).join(' ')}`,
+      body: `<p>${esc(c.help)}</p>
+        <h3>格式</h3><pre class="code">${esc(P.signature(c))}</pre>
+        <h3>参数</h3><table class="t"><tr><th>参数</th><th>类型</th><th>必填</th></tr>${c.args.map(([n, t]) => `<tr><td>${esc(n.replace('?', ''))}</td><td><code>${esc(t)}</code> <span class="muted">${esc(P.TYPES[t].name)}</span></td><td>${n.endsWith('?') ? '<span class="dim">可省略</span>' : '是'}</td></tr>`).join('')}</table>
+        ${o ? `<h3>生成的长期命令</h3>${orderChip(o)}<h3>能接这条命令的职业（${ps.length}）</h3>${ps.map(profChip).join('') || '<span class="dim">无</span>'}` : ''}
+        <h3>例子</h3>${c.examples.map((e) => `<div class="ex-row">${cmdline(e)}<button class="btn sm" data-copy="${esc(e)}">复制</button><button class="btn sm" data-try="${esc(e)}">试一试</button></div>`).join('')}
+        <h3>这一份定义自动用于</h3>${['文本解析器', 'AI 提示词命令表', '上帝面板按钮', 'docs/commands.md', '契约测试（例子必须执行成功）'].map((x) => `<span class="chip">✓ ${x}</span>`).join('')}
+        <h3>定义（草案）</h3><pre class="code">${hl(code)}</pre>` };
+  };
+
+  drawers.components = (c) => {
+    const users = c.base ? A.professions : A.professions.filter((p) => optionalCompsFor(p).includes(c.id));
+    return { kind: '组件', title: `<code style="color:#c4b5fd">${esc(c.id)}</code> ${esc(c.name)}`, sub: `${ownerChip(c.owner)} ${c.base ? '<span class="chip">基础组件：每个 NPC 都有</span>' : '<span class="chip">可选组件</span>'}`,
+      body: `<h3>字段</h3><table class="t"><tr><th>字段</th><th>类型</th><th>说明</th></tr>${c.fields.map((f) => `<tr><td><code>${esc(f[0])}</code></td><td class="mono dim">${esc(f[1])}</td><td>${esc(f[2])}</td></tr>`).join('')}</table>
+        <div class="row" style="margin-top:10px"><span class="chip">约 ${compBytes(c)} 字节 / 人</span><span class="chip">按列存放：同一字段的所有 NPC 在一个紧凑数组里</span></div>
+        <h3>哪些职业有它（${users.length}）</h3>${users.map(profChip).join('') || '<span class="dim">暂无</span>'}` };
+  };
+
+  drawers.orders = (o) => {
+    const bs = A.behaviors.filter((b) => b.fits.includes(o.id));
+    return { kind: '长期命令 Order', title: `📋 ${esc(o.name)} <span class="dim mono" style="font-size:15px">${esc(o.id)}</span>`, sub: ownerChip(o.module),
+      body: `<p>${esc(o.text)}</p>
+        <div class="kv"><span class="k2">参数</span><span>${o.params.map((x) => `<code>${esc(x)}</code>`).join(' ') || '<span class="dim">无</span>'}</span></div>
+        <h3>由哪些命令生成</h3>${commandsFor(o.id).map(cmdChip).join('') || '<span class="dim">无（只作为默认命令）</span>'}
+        <h3>能完成它的行为</h3>${bs.map(behChip).join('')}
+        <h3>能接它的职业（${profsForOrder(o.id).length}）</h3>${profsForOrder(o.id).map(profChip).join('') || '<span class="dim">无</span>'}
+        <div class="card-text" style="margin-top:14px">一个编组共用一条 Order：500 个人接同一条命令只存一份；改它，NPC 下次空闲时自然换活。</div>` };
+  };
+
+  drawers.behaviors = (b) => {
+    const ps = A.professions.filter((p) => p.behaviors.includes(b.id));
+    const code = `export const ${b.id}: BehaviorDef = {\n  id: '${b.id}',\n  fits(npc, order, ctx) { /* ${b.support ? '辅助行为：由前一个行为接力调用，这里返回 0' : '能完成 ' + b.fits.join(' / ') + ' 时返回优先级，做不了返回 0'} */ },\n  start(npc, ctx) { },\n  tick(npc, ctx) { /* ${b.loop.join(' → ')} */ return 'running'; },\n  coarse(npc, ctx, dt) { /* 远处粗算：按时间推进 */ },\n};`;
+    return { kind: '行为 Behavior', title: `⚙ ${esc(b.name)} <span class="dim mono" style="font-size:15px">${esc(b.id)}</span>`, sub: `${ownerChip(b.module)} ${b.coarse ? '<span class="chip">支持远处粗算</span>' : ''}`,
+      body: `<p>${esc(b.text)}</p>
+        <h3>循环</h3><div class="loop">${b.loop.map((s) => `<span>${esc(s)}</span>`).join('')}</div>
+        <h3>能完成的长期命令</h3>${b.support ? '<span class="chip">辅助行为：不单独完成命令，跟在采集、耕种后面自动接上</span>' : b.fits.map((f) => (f === '*' ? '<span class="chip">任何命令（兜底）</span>' : orderChip(order(f)))).join('')}
+        <h3>调用的动作</h3>${plainChips(b.acts, true)}
+        <h3>哪些职业会做（${ps.length}）</h3>${ps.map(profChip).join('')}
+        <h3>接口（草案）</h3><pre class="code">${hl(code)}</pre>` };
+  };
+
+  const FINDERS = { layers: layer, modules: mod, professions: prof, commands: cmd, components: comp, orders: order, behaviors: beh };
+
+  function openDrawer(sec, id) {
+    const item = FINDERS[sec] && FINDERS[sec](decodeURIComponent(id));
+    const dr = $('#drawer');
+    if (!item) { closeDrawerUI(); return null; }
+    const d = drawers[sec](item);
+    clearTimers(drawerTimers);
+    dr.innerHTML = `<div class="dr-head"><button class="dr-close" type="button" data-close>✕</button><div class="dr-kind">${esc(d.kind)}</div><div class="dr-title">${d.title}</div><div class="row">${d.sub || ''}</div></div><div class="dr-body">${d.body}</div>`;
+    dr.scrollTop = 0;
+    dr.classList.add('on'); dr.setAttribute('aria-hidden', 'false'); $('#scrim').classList.add('on');
+    animateLoop(dr, drawerTimers, 850);
+    return item;
+  }
+  function closeDrawerUI() {
+    clearTimers(drawerTimers);
+    $('#drawer').classList.remove('on'); $('#drawer').setAttribute('aria-hidden', 'true'); $('#scrim').classList.remove('on');
+  }
+
+  // ------------------------------------------------------------ 路由
+  let currentPage = null;
+  function renderPage(page, force) {
+    if (page === currentPage && !force) return;
+    currentPage = page;
+    clearTimers(pageTimers);
+    const view = $('#view');
+    view.innerHTML = pages[page]();
+    view.style.animation = 'none'; void view.offsetHeight; view.style.animation = '';
+    if (pages[page].mount) pages[page].mount(view);
+    if (!force) $('#main').scrollTop = 0;
+    renderNav(page);
+  }
+  function route() {
+    const parts = location.hash.replace(/^#\/?/, '').split('/');
+    let sec = parts[0] || 'overview'; const id = parts.slice(1).join('/');
+    if (!pages[sec] && !PAGE_OF[sec]) sec = 'overview';
+    const page = PAGE_OF[sec] || sec;
+    renderPage(page);
+    const secName = (SECTIONS.find((s) => s.id === page) || {}).name || '';
+    let itemName = '';
+    if (id) { const item = openDrawer(sec, id); if (item) itemName = item.name || item.verb || item.id; } else closeDrawerUI();
+    $('#crumb').innerHTML = `架构图谱 / <b>${esc(secName)}</b>${itemName ? ' / ' + esc(itemName) : ''}`;
+    document.title = `${itemName || secName} · ${A.meta.title}`;
+  }
+  function closeDrawer() {
+    const parts = location.hash.replace(/^#\/?/, '').split('/');
+    if (parts.length > 1) location.hash = '#/' + (PAGE_OF[parts[0]] || parts[0]); else closeDrawerUI();
+  }
+
+  // ------------------------------------------------------------ 搜索
+  const searchIndex = [
+    ...A.layers.map((l) => ({ kind: '分层', title: `${l.name} ${l.en}`, desc: l.role, go: '#/layers/' + l.id })),
+    ...A.modules.map((m) => ({ kind: '模块', title: `${m.icon} ${m.name} ${m.id}`, desc: m.summary, go: '#/modules/' + m.id })),
+    ...A.professions.map((p) => ({ kind: '职业', title: `${p.name} @${p.short}`, desc: p.text, go: '#/professions/' + p.id, extra: p.id })),
+    ...A.commands.map((c) => ({ kind: '命令', title: `${c.verb}  ${c.id}`, desc: c.help, go: '#/commands/' + c.id, extra: c.examples.join(' ') })),
+    ...A.components.map((c) => ({ kind: '组件', title: `${c.id} ${c.name}`, desc: c.fields.map((f) => f[0]).join(' '), go: '#/components/' + c.id })),
+    ...A.orders.map((o) => ({ kind: '长期命令', title: `${o.name} ${o.id}`, desc: o.text, go: '#/orders/' + o.id })),
+    ...A.behaviors.map((b) => ({ kind: '行为', title: `${b.name} ${b.id}`, desc: b.text, go: '#/behaviors/' + b.id })),
+    ...SECTIONS.filter((s) => s.id).map((s) => ({ kind: '页面', title: s.name, desc: '', go: '#/' + s.id })),
+  ].map((e) => ({ ...e, key: (e.title + ' ' + e.desc + ' ' + (e.extra || '')).toLowerCase() }));
+  let palSel = 0; let palHits = [];
+  function openPalette() { $('#palette').classList.add('on'); const i = $('#palInput'); i.value = ''; renderPalette(); setTimeout(() => i.focus(), 10); }
+  function closePalette() { $('#palette').classList.remove('on'); }
+  function renderPalette() {
+    const q = $('#palInput').value.trim().toLowerCase();
+    const toks = q.split(/\s+/).filter(Boolean);
+    palHits = (toks.length ? searchIndex.filter((e) => toks.every((t) => e.key.includes(t))) : searchIndex.filter((e) => e.kind === '页面' || e.kind === '职业')).slice(0, 40);
+    palSel = Math.min(palSel, Math.max(0, palHits.length - 1));
+    $('#palList').innerHTML = palHits.map((e, i) => `<div class="pal-item${i === palSel ? ' on' : ''}" data-i="${i}"><span class="kind">${esc(e.kind)}</span><span>${esc(e.title)}</span><span class="desc">${esc(e.desc)}</span></div>`).join('') || '<div class="pal-item dim">没有结果</div>';
+  }
+  function pickPalette(i) { const e = palHits[i]; if (!e) return; closePalette(); location.hash = e.go; }
+
+  // ------------------------------------------------------------ 全局事件
+  document.addEventListener('click', (ev) => {
+    const t = ev.target;
+    const cp = t.closest('[data-copy]'); if (cp) { ev.stopPropagation(); copy(cp.dataset.copy); return; }
+    const tr = t.closest('[data-try]');
+    if (tr) {
+      ev.stopPropagation(); pg.text = tr.dataset.try;
+      if (currentPage === 'commands' && !location.hash.split('/')[2]) { const inp = $('#pgInput'); inp.value = pg.text; renderPlayground($('#view')); inp.focus(); }
+      else { currentPage = null; location.hash = '#/commands'; }
+      return;
+    }
+    if (t.closest('[data-close]') || t.id === 'scrim') { closeDrawer(); return; }
+    const pi = t.closest('.pal-item[data-i]'); if (pi) { pickPalette(+pi.dataset.i); return; }
+    if (t.id === 'palette') { closePalette(); return; }
+    const g = t.closest('[data-go]'); if (g) { ev.preventDefault(); location.hash = g.dataset.go; }
+  });
+  $('#searchBtn').addEventListener('click', openPalette);
+  $('#palInput').addEventListener('input', () => { palSel = 0; renderPalette(); });
+  document.addEventListener('keydown', (ev) => {
+    const palOpen = $('#palette').classList.contains('on');
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') { ev.preventDefault(); palOpen ? closePalette() : openPalette(); return; }
+    if (palOpen) {
+      if (ev.key === 'Escape') closePalette();
+      else if (ev.key === 'ArrowDown') { ev.preventDefault(); palSel = Math.min(palSel + 1, palHits.length - 1); renderPalette(); }
+      else if (ev.key === 'ArrowUp') { ev.preventDefault(); palSel = Math.max(palSel - 1, 0); renderPalette(); }
+      else if (ev.key === 'Enter') pickPalette(palSel);
+      return;
+    }
+    if (ev.key === 'Escape' && $('#drawer').classList.contains('on')) closeDrawer();
+    if (ev.key === '/' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { ev.preventDefault(); openPalette(); }
+  });
+  window.addEventListener('hashchange', route);
+  route();
+})();
+
+</script>
+</body>
+</html>
