@@ -6,7 +6,7 @@ export const CITY: BuildingDef = { id: 'city', name: '新城', site: 'town', cos
 
 export const BUILDINGS: BuildingDef[] = [
   { id: 'house', name: '房屋', site: 'town', cost: { wood: 40 }, work: 120, max: 20, text: '人口上限 +30' },
-  { id: 'farm', name: '农田', site: 'town', cost: { wood: 20 }, work: 80, max: 10, text: '城边多 6 块田' },
+  { id: 'farm', name: '农田', site: 'town', cost: { wood: 20 }, work: 80, max: 10, text: '农夫来开垦（不是建筑工）：城边按格子多一畦 6 块田' },
   { id: 'wall', name: '城墙', site: 'town', cost: { stone: 120, wood: 30 }, work: 400, max: 3, text: '守城：每层城墙让守军伤害减免 20%，围城要多守 1 天' },
   { id: 'barracks', name: '兵营', site: 'town', cost: { wood: 80, stone: 40 }, work: 240, max: 1, text: '本城士兵攻击 +25%、转兵免一半粮' },
   { id: 'forge', name: '铁匠铺', site: 'town', cost: { wood: 60, stone: 60 }, work: 240, max: 1, text: '本城铁匠打造速度 ×2' },

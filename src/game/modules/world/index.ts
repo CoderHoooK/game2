@@ -47,6 +47,8 @@ export interface WorldApi {
   isLand(x: number, y: number): boolean;
   chunk(cx: number, cy: number): Uint8Array;
   addNode(kindKey: string, x: number, y: number, full?: boolean): number;
+  /** 在城边找下一块空的「田畦」（3×2 共 6 块田，排成整齐的格子），没地方返回 null；只算点，不建 */
+  fieldPlot(cx: number, cy: number, townRadius: number): [number, number][] | null;
   /** 当前数量（顺便结算懒恢复） */
   level(n: number): number;
   nearestNode(kindKey: string, x: number, y: number, maxDist: number, region?: number, min?: number): number;
@@ -196,6 +198,28 @@ export const world: GameModule = {
         chunkCache.set(key, c);
         if (chunkCache.size > 1024) chunkCache.delete(chunkCache.keys().next().value!);
         return c;
+      },
+      fieldPlot(cx, cy, townRadius) {
+        // 田畦 = 3 列 × 2 行，田间距 12 米；畦与畦按 44×30 米的格子排，从离城最近的格子开始往外一圈圈占
+        const GX = 44;
+        const GY = 30;
+        const cells: [number, number][] = [];
+        for (let i = -6; i <= 6; i++)
+          for (let j = -6; j <= 6; j++) {
+            // 压到城的方框上的格子不要（城方框半边 = townRadius，畦半宽 16、半高 10，再留 4 米）
+            if (Math.abs(i * GX) < townRadius + 20 && Math.abs(j * GY) < townRadius + 14) continue;
+            cells.push([i, j]);
+          }
+        cells.sort((a, b) => (a[0] * GX) ** 2 + (a[1] * GY) ** 2 - ((b[0] * GX) ** 2 + (b[1] * GY) ** 2) || a[1] - b[1] || a[0] - b[0]);
+        for (const [i, j] of cells) {
+          const x = cx + i * GX;
+          const y = cy + j * GY;
+          if (api2.nearestNode('field', x, y, 16, undefined, 0) >= 0) continue; // 已经有田了
+          const pts: [number, number][] = [];
+          for (const dy of [-6, 6]) for (const dx of [-12, 0, 12]) pts.push([x + dx, y + dy]);
+          if (pts.every(([px, py]) => api2.isLand(px, py))) return pts;
+        }
+        return null;
       },
       addNode(kindKey, x, y, full = true) {
         const k = kindIndex.get(kindKey);

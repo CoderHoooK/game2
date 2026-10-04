@@ -9,6 +9,7 @@ import type { Selector } from '../../../engine/commands/selector';
 import { Rng } from '../../../shared/rng';
 import type { Entity } from '../../../shared/types';
 import type { BuildingDef } from '../../../shared/content';
+import type { BehaviorDef } from '../../../engine/brain';
 import type { EconomyApi } from '../economy';
 import { Identity, type PopulationApi, type Town } from '../population';
 import { Profession, type JobsApi, type PlaceParam } from '../jobs';
@@ -97,10 +98,8 @@ export const building: GameModule = {
         if (s.building === 'wall') t.walls = t.buildings.wall;
         if (s.building === 'granary') eco.stores[t.store].spoil = 0.005 * 0.5 ** t.buildings.granary;
         if (s.building === 'farm' && sign > 0)
-          for (let k = 0; k < 6; k++) {
-            const [x, y] = world.landPointNear(t.x, t.y, t.radius + 40, rng);
-            world.addNode('field', x, y);
-          }
+          // 6 块田排成整齐的一畦，一畦挨一畦往外排（没地方就不加）
+          for (const [x, y] of world.fieldPlot(t.x, t.y, t.radius) ?? []) world.addNode('field', x, y);
       } else {
         const r = regionB.get(s.region) ?? {};
         r[s.building] = (r[s.building] ?? 0) + sign;
@@ -128,9 +127,10 @@ export const building: GameModule = {
     };
 
     // ---- 施工行为
-    const pickSite = (e: Entity, p: PlaceParam | undefined): Site | undefined => {
+    /** farm = true：农夫开垦农田工地；false：建筑工建别的（农田工地不归建筑工） */
+    const pickSite = (e: Entity, p: PlaceParam | undefined, farm = false): Site | undefined => {
       const fi = I.faction[e];
-      const mine = sites.filter((s) => s.faction === fi);
+      const mine = sites.filter((s) => s.faction === fi && (s.building === 'farm') === farm);
       if (!mine.length) return undefined;
       const place = p && p !== 'home' ? (p as Place) : null;
       const home = I.home[e];
@@ -144,15 +144,23 @@ export const building: GameModule = {
       const list = place ? mine.filter((s) => pri(s) === 0) : mine;
       return list.sort((a, b) => pri(a) - pri(b) || a.id - b.id)[0];
     };
-    api.addBehavior({
-      id: 'build',
-      name: '施工',
+    const workOn = (id: string, name: string, farm: boolean, text: string): BehaviorDef => ({
+      id,
+      name,
       orders: ['build'],
       acts: ['moveTo', 'wait'],
-      text: '去工地干活（每次 5 秒，熟练度越高出活越多）；工地建成就生效',
-      fits: (_s, e, o) => (o?.type === 'build' && pickSite(e, o.params.place as PlaceParam) ? 45 : 0),
+      text,
+      fits(_s, e, o) {
+        if (o?.type === 'build') return pickSite(e, o.params.place as PlaceParam, farm) ? 45 : 0;
+        // 农夫平时（没被派去别处）：本城有农田工地，就先去开垦，比种田优先
+        if (farm && o?.type === 'work' && !o.params.place) {
+          const home = I.home[e];
+          return sites.some((s) => s.building === 'farm' && s.town === home && s.faction === I.faction[e]) ? 55 : 0;
+        }
+        return 0;
+      },
       start(_s, e, o) {
-        const s = pickSite(e, o!.params.place as PlaceParam);
+        const s = pickSite(e, o!.type === 'build' ? (o!.params.place as PlaceParam) : undefined, farm);
         if (!s) return false;
         B.target[e] = s.id;
         const [x, y] = world.landPointNear(s.x, s.y, 12, rng);
@@ -184,6 +192,8 @@ export const building: GameModule = {
         return 'done';
       },
     });
+    api.addBehavior(workOn('build', '施工', false, '建筑工去工地干活（每次 5 秒，熟练度越高出活越多）；工地建成就生效。农田工地不归建筑工'));
+    api.addBehavior(workOn('reclaim', '开垦', true, '农夫去农田工地开垦（平时本城有农田工地就先去，比种田优先）；开垦完城边多一畦整齐的田'));
 
     // ---- 命令
     const ownerOk = (fi: number, region: number) => {
@@ -229,7 +239,11 @@ export const building: GameModule = {
           let msg = `${place.name} 开工建${d.name}（要 ${d.work} 工时）`;
           const warns: string[] = [];
           if (a['人']) {
-            const r = jobs.dispatch(src, sim.bus.select(a['人'] as Selector, src), 'build', { place }, `建${d.name} @ ${place.name}`);
+            const isFarmer = (e: Entity) => PR.prof[e] === jobs.profIndex('farmer');
+            const r = jobs.dispatch(src, sim.bus.select(a['人'] as Selector, src), 'build', { place }, `建${d.name} @ ${place.name}`, {
+              filter: (e) => isFarmer(e) === (d.id === 'farm'),
+              why: d.id === 'farm' ? '农田要农夫来开垦' : '这活归建筑工',
+            });
             msg += '；' + r.msg;
             warns.push(...(r.warns ?? []));
           }

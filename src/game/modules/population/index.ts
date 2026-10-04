@@ -115,7 +115,7 @@ export const population: GameModule = {
     ...Object.fromEntries(
       PROFESSIONS.map((p) => [`start${p.id[0].toUpperCase()}${p.id.slice(1)}`, { default: START_DEFAULTS.people[p.id] ?? 0, text: `开局${p.name}人数（每座营地）`, min: 0, max: 5000 }]),
     ),
-    startFields: { default: 0, text: '开局营地边的田块数（0 = 没有，田要靠「农田」建筑，每座 +6 块）', min: 0, max: 200 },
+    startFields: { default: 0, text: '开局营地边的田块数（0 = 没有，田要农夫「开垦」农田建筑，每座 +6 块；排成整齐的田畦）', min: 0, max: 200 },
     campCap: { default: START_DEFAULTS.campCap, text: '营地人口上限（不低于开局人数；每座房屋 +30）', min: 1, max: 100000 },
     lordNotables: { default: 0, text: '开局每个诸侯带将军和谋士（0 = 不带；在野名人不受影响）', min: 0, max: 1 },
     growth: { default: 0, text: '吃饱、民心好时每天的自然出生率（0 = 关闭，人口只能靠人才市场招；原版 0.004）', min: 0, max: 0.1 },
@@ -256,12 +256,12 @@ export const population: GameModule = {
     // ---- 营地边的田（默认 0：田要靠「农田」建筑）；附近没树林的给几片小树林（每座城都缺点什么，但不至于没柴烧）
     const fieldsN = api.config.startFields as number;
     for (const t of towns) {
-      for (let k = 0; t.founded && k < fieldsN; k++) {
-        const a = (k / fieldsN) * Math.PI * 2 + rng.range(-0.15, 0.15);
-        const r = rng.range(70, 200);
-        const x = t.x + Math.cos(a) * r;
-        const y = t.y + Math.sin(a) * r;
-        if (world.isLand(x, y)) world.addNode('field', x, y);
+      // 田排成整齐的田畦（每畦 6 块），最后一畦不够就少放几块
+      for (let left = t.founded ? fieldsN : 0; left > 0; ) {
+        const plot = world.fieldPlot(t.x, t.y, t.radius);
+        if (!plot) break;
+        for (const [x, y] of plot.slice(0, left)) world.addNode('field', x, y);
+        left -= 6;
       }
       if (world.nearestNode('wood', t.x, t.y, 1200) < 0) {
         for (let k = 0; k < 5; k++) {

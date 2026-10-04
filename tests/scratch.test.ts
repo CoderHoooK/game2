@@ -1,6 +1,6 @@
 // 从零开始的开局：每个诸侯一座营地、其余是空城址；人口、物资按设置；旧存档读不了。
 import { describe, it, expect } from 'vitest';
-import { createGame, Notable, type BuildingApi, type PopulationApi, type JobsApi, type EconomyApi, type MilitaryApi } from '../src/game';
+import { createGame, Notable, type WorldApi, type BuildingApi, type PopulationApi, type JobsApi, type EconomyApi, type MilitaryApi } from '../src/game';
 import { saveSim, loadSim } from '../src/engine/save';
 import { AiHost, buildBriefing } from '../src/ai';
 import { PROFESSIONS } from '../content/professions';
@@ -219,5 +219,50 @@ describe('脚本诸侯从零开始', () => {
     expect(text).toContain('## 空城址');
     expect(text).toContain('河口镇');
     expect(text).toContain('建城');
+  });
+});
+
+describe('农田：农夫开垦，田排成整齐的田畦', () => {
+  const lord = { role: 'lord' as const, faction: '青龙', origin: 'test' as const };
+  const fieldsOf = (s: ReturnType<typeof createGame>) => {
+    const w = s.service<WorldApi>('world');
+    const k = w.kinds.findIndex((x) => x.key === 'field');
+    const out: [number, number][] = [];
+    for (let i = 0; i < w.nodes.count; i++) if (w.nodes.kind[i] === k) out.push([w.nodes.x[i], w.nodes.y[i]]);
+    return out;
+  };
+  it('建农田：农夫自己去干，建筑工不碰', () => {
+    const s = createGame({ seed: 1 });
+    const { P } = parts(s);
+    const t = P.townByName('青石城')!;
+    expect(s.bus.exec('建 农田 青石城', lord).ok).toBe(true);
+    const done = () => (t.buildings.farm ?? 0) > 0;
+    for (let i = 0; i < 40 && !done(); i++) s.run(25);
+    expect(done()).toBe(true);
+    expect(fieldsOf(s).length).toBe(6);
+    // 指定建筑工去开垦：被跳过并说明原因
+    const r = s.bus.exec('建 农田 青石城 @建:3', lord);
+    expect(r.ok).toBe(true);
+    expect(JSON.stringify(r)).toContain('农田要农夫来开垦');
+    const r2 = s.bus.exec('建 房屋 青石城 @农:3', lord);
+    expect(JSON.stringify(r2)).toContain('这活归建筑工');
+  });
+  it('多块农田排成格子：畦内 3×2、间距 12 米，畦与畦不重叠，也不压在城里', () => {
+    const s = createGame({ seed: 1, config: { population: { startFields: 30, startWood: 1000 } } });
+    const { P } = parts(s);
+    const t = P.townByName('青石城')!;
+    const near = fieldsOf(s).filter(([x, y]) => Math.hypot(x - t.x, y - t.y) < 400);
+    expect(near.length).toBe(30);
+    const seen = new Set<string>();
+    for (const [x, y] of near) {
+      const dx = Math.round(x - t.x);
+      const dy = Math.round(y - t.y);
+      expect([0, 12, 24], `x ${dx}`).toContain(((dx + 12) % 44 + 44) % 44);
+      expect([0, 12], `y ${dy}`).toContain(((dy + 6) % 30 + 30) % 30);
+      expect(Math.abs(dx) >= t.radius + 2 || Math.abs(dy) >= t.radius + 2, `压在城里 ${dx},${dy}`).toBe(true);
+      const key = `${dx},${dy}`;
+      expect(seen.has(key), `重叠 ${key}`).toBe(false);
+      seen.add(key);
+    }
   });
 });

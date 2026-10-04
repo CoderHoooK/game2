@@ -5,10 +5,10 @@ import { defineProfession } from '../src/shared/content';
 export const PROFESSIONS = [
   defineProfession({
     id: 'farmer', name: '农夫', short: '农', color: '#84cc16', shape: 'circle', tags: ['worker'],
-    stats: { speed: 1.0, carry: 10, hp: 100, attack: 2 }, behaviors: ['farm', 'deliver', 'flee', 'idle'],
+    stats: { speed: 1.0, carry: 10, hp: 100, attack: 2 }, behaviors: ['reclaim', 'farm', 'deliver', 'flee', 'idle'],
     defaultOrder: { type: 'work', resource: 'food' }, gathers: 'food',
     tools: { 锄头: 1.4 }, upkeep: { 粮: 1 }, train: { cost: { 粮: 3 }, days: 1, hire: 10 },
-    text: '在城镇附近的田里春种秋收，是全国的饭碗。冬天田里不产粮。',
+    text: '在城镇附近的田里春种秋收，是全国的饭碗。冬天田里不产粮。城里有农田工地时，农夫自己去开垦。',
   }),
   defineProfession({
     id: 'woodcutter', name: '伐木工', short: '木', color: '#d97706', shape: 'triangle', tags: ['worker'],

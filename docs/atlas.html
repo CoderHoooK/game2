@@ -501,7 +501,8 @@ globalThis.ATLAS = {
     { id: 'deliver', status: 'wip', acts: ['moveTo', 'deposit'], name: '送回', module: 'jobs', fits: [], support: true, coarse: true, loop: ['走回仓库', '卸货'], text: '辅助行为：拿满了送回最近的己方仓库' },
     { id: 'craft', status: 'wip', acts: ['moveTo', 'wait', 'convert'], name: '打造', module: 'jobs', fits: ['work'], coarse: true, loop: ['取料', '打造', '入库'], text: '在城里的铁匠铺把仓库里的铁和木头打成兵器（铁 1 + 木 2，8 秒一件；铁匠铺让速度翻倍）' },
     { id: 'haul', status: 'wip', acts: ['moveTo', 'withdraw', 'deposit'], name: '搬运', module: 'jobs', fits: ['haul'], coarse: true, loop: ['去取货', '运送', '卸货'], text: '去出发城的仓库取货 → 走到目的城 → 卸货。自动模式：把粮食从人均最多的己方城运到人均最少的' },
-    { id: 'build', status: 'wip', acts: ['moveTo', 'wait'], name: '施工', module: 'building', fits: ['build'], coarse: true, loop: ['取木石', '走到工地', '投料施工'], text: '去工地干活（每次 5 秒，熟练度越高出活越多）；工地建成就生效' },
+    { id: 'build', status: 'wip', acts: ['moveTo', 'wait'], name: '施工', module: 'building', fits: ['build'], coarse: true, loop: ['取木石', '走到工地', '投料施工'], text: '建筑工去工地干活（每次 5 秒，熟练度越高出活越多）；工地建成就生效。农田工地不归建筑工' },
+    { id: 'reclaim', status: 'wip', acts: ['moveTo', 'wait'], name: '开垦', module: 'building', fits: ['build'], coarse: true, loop: ['走到农田工地', '开垦'], text: '农夫去农田工地开垦（平时本城有农田工地就先去，比种田优先）；开垦完城边多一畦整齐的田' },
     { id: 'fight', status: 'wip', acts: ['moveTo', 'attack'], name: '交战', module: 'military', fits: [], coarse: true, loop: ['锁定敌人', '接近', '攻击'], text: '附近 70 米有敌人就冲上去打（优先打兵）；对方死了或跑远了就回去执行原来的命令', support: true },
     { id: 'guard', status: 'wip', acts: ['moveTo', 'wait'], name: '站岗', module: 'military', fits: ['guard'], coarse: true, loop: ['站位', '警戒'], text: '守在指定地点附近（城镇：城墙一圈）' },
     { id: 'patrol', status: 'wip', acts: ['moveTo', 'wait'], name: '巡逻', module: 'military', fits: ['patrol'], coarse: true, loop: ['走向巡逻点', '换下一个点'], text: '在区域里来回走' },
@@ -516,9 +517,9 @@ globalThis.ATLAS = {
   // ------------------------------------------------------------------ 职业
   professions: [
     { id: 'farmer', name: '农夫', short: '农', color: '#84cc16', tags: ['worker'], status: 'wip',
-      stats: { speed: 1.0, carry: 10, hp: 100, attack: 2 }, behaviors: ['farm', 'deliver', 'flee', 'idle'],
+      stats: { speed: 1.0, carry: 10, hp: 100, attack: 2 }, behaviors: ['reclaim', 'farm', 'deliver', 'flee', 'idle'],
       defaultOrder: 'work: 粮食', tools: { 锄头: 1.4 }, upkeep: { 粮: 1 }, train: { cost: { 粮: 3 }, days: 1 },
-      text: '在城镇附近的田里春种秋收，是全国的饭碗。冬天田里不产粮。' },
+      text: '在城镇附近的田里春种秋收，是全国的饭碗。冬天田里不产粮。城里有农田工地时，农夫自己去开垦。' },
     { id: 'woodcutter', name: '伐木工', short: '木', color: '#d97706', tags: ['worker'], status: 'wip',
       stats: { speed: 1.0, carry: 10, hp: 100, attack: 3 }, behaviors: ['gather', 'deliver', 'flee', 'idle'],
       defaultOrder: 'work: 木头', tools: { 斧头: 1.5 }, upkeep: { 粮: 1 }, train: { cost: { 粮: 3 }, days: 1 },
