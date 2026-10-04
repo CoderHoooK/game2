@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGame, Notable, type BuildingApi, type PopulationApi, type JobsApi, type EconomyApi, type MilitaryApi } from '../src/game';
 import { saveSim, loadSim } from '../src/engine/save';
+import { AiHost, buildBriefing } from '../src/ai';
 import { PROFESSIONS } from '../content/professions';
 
 const parts = (sim: ReturnType<typeof createGame>) => ({
@@ -76,7 +77,7 @@ describe('从零开始的开局', () => {
 describe('人才市场与「募」', () => {
   const lord = { role: 'lord' as const, faction: '青龙', origin: 'test' as const };
   const setup = () => {
-    const s = createGame({ seed: 1 });
+    const s = createGame({ seed: 1, config: { talent: { bankDays: 1 } } });
     const { P, E } = parts(s);
     const t = P.townByName('青石城')!;
     const put = (item: string, n: number) => E.stores[t.store].stock[E.itemIndex(item)] += n;
@@ -88,6 +89,19 @@ describe('人才市场与「募」', () => {
     const r = s.bus.exec('募 青石城 农:1', lord);
     expect(r.ok).toBe(false);
     expect(r.msg).toContain('人才市场');
+  });
+  it('名额会攒着：几天不招，一次能招更多', () => {
+    const s = createGame({ seed: 1 });
+    const { P, E } = parts(s);
+    const t = P.townByName('青石城')!;
+    t.buildings.talent = 1;
+    t.cap = 100;
+    E.stores[t.store].stock[E.itemIndex('gold')] = 1000;
+    E.stores[t.store].stock[E.itemIndex('food')] = 1000;
+    expect(s.bus.exec('募 青石城 农:12', lord).ok).toBe(true); // 开局就攒着 50 个
+    expect(s.bus.exec('募 青石城 农:40', lord).msg).toContain('只剩 38 个名额');
+    s.run(300); // 3 天 +15（用掉的 12 个已经全部恢复）
+    expect(s.bus.exec('募 青石城 农:60', lord).msg).toContain('只剩 50 个名额');
   });
   it('建好人才市场就能募：扣金和粮、人口 +、职业对', () => {
     const { s, P, t, have } = setup();
@@ -108,7 +122,7 @@ describe('人才市场与「募」', () => {
     t.buildings.talent = 1;
     put('gold', 1000);
     put('food', 1000);
-    expect(s.bus.exec('募 青石城 农:6', lord).msg).toContain('今天还能招 5 人');
+    expect(s.bus.exec('募 青石城 农:6', lord).msg).toContain('只剩 5 个名额');
     expect(s.bus.exec('募 青石城 兵:1', lord).msg).toContain('兵营');
     expect(s.bus.exec('募 青石城 农:5', lord).ok).toBe(true);
     expect(s.bus.exec('募 青石城 农:1', lord).ok).toBe(false); // 今天满了
@@ -181,5 +195,29 @@ describe('建城', () => {
     expect(runUntil(s, () => (t.buildings.talent ?? 0) > 0)).toBe(true);
     expect(s.bus.exec('募 河口镇 农:3', lord()).ok).toBe(true);
     expect(P.residents(t.id).length).toBe(3);
+  });
+});
+
+describe('脚本诸侯从零开始', () => {
+  it('120 天：不饿死、建人才市场、招人壮大，至少一家建出第二座城', () => {
+    const s = createGame({ seed: 1 });
+    const host = new AiHost(s);
+    const { P } = parts(s);
+    for (let i = 0; i < 12000; i++) (host.step(), s.tick());
+    for (const f of P.factions.filter((x) => x.kind === 'lord' && x.alive)) {
+      const home = P.towns[f.towns[0]];
+      expect(home.buildings.talent ?? 0, f.name).toBe(1);
+      expect(P.residents(home.id).length, f.name).toBeGreaterThan(60);
+    }
+    expect(P.factions.some((f) => f.kind === 'lord' && f.towns.length >= 2)).toBe(true);
+  });
+
+  it('简报里有招募价格、名额、空城址（只有事实）', () => {
+    const s = createGame({ seed: 1 });
+    const text = buildBriefing(s, '青龙', { lastEntry: 0, lastMsg: 0 });
+    expect(text).toContain('## 招募');
+    expect(text).toContain('## 空城址');
+    expect(text).toContain('河口镇');
+    expect(text).toContain('建城');
   });
 });

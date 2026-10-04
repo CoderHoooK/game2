@@ -2,7 +2,7 @@
 // 按性格（好战 / 外交 / 建设）做决定，输出和大模型一样的命令行。用来让世界在没联网时也能「勾心斗角」。
 import type { Sim } from '../engine/sim';
 import { Rng } from '../shared/rng';
-import { Identity, type EconomyApi, type PopulationApi, type JobsApi, type DiplomacyApi, type MilitaryApi, type BuildingApi, type Town } from '../game';
+import { Identity, Profession, type EconomyApi, type PopulationApi, type JobsApi, type DiplomacyApi, type MilitaryApi, type BuildingApi, type TalentApi, type Town } from '../game';
 
 export interface Personality {
   name: string;
@@ -23,6 +23,8 @@ export interface ScriptMemory {
   quota: Record<number, string>;
   target?: string;
   proposed: Record<string, number>;
+  /** 正在往哪些新城运料（城镇序号 → 是否在运） */
+  hauling?: Record<number, boolean>;
 }
 export const newMemory = (): ScriptMemory => ({ wakes: 0, quota: {}, proposed: {} });
 
@@ -33,6 +35,7 @@ export function decide(sim: Sim, faction: string, pers: Personality, mem: Script
   const dip = sim.service<DiplomacyApi>('diplomacy');
   const mil = sim.service<MilitaryApi>('military');
   const bld = sim.service<BuildingApi>('building');
+  const tal = sim.service<TalentApi>('talent');
   const fi = pop.factionIndex(faction);
   const me = pop.factions[fi];
   if (!me?.alive || !me.towns.length) return [];
@@ -63,6 +66,7 @@ export function decide(sim: Sim, faction: string, pers: Personality, mem: Script
     const fd = foodDays(t);
     const farm = fd < 25 ? 40 : fd > 120 ? 22 : 30;
     const sold = Math.round(12 + pers.aggression * 18 + (enemies.length ? 8 : 0));
+    if (t.pop < 40) continue; // 人少的时候不按比例转职（会把刚招来的人又转走）
     const q = `农${farm} 木14 石8 矿6 建7 铁3 运5 兵${sold} 斥4 商${Math.max(3, 9 - Math.round(pers.aggression * 5))}`;
     if (mem.quota[t.id] !== q) {
       out.push(`比例 ${t.name} ${q}`);
@@ -73,25 +77,92 @@ export function decide(sim: Sim, faction: string, pers: Personality, mem: Script
   const lowFood = towns.filter((t) => foodDays(t) < 15);
   if (lowFood.length) thoughts.push(`${lowFood.map((t) => t.name).join('、')} 粮只够 ${Math.round(Math.min(...lowFood.map(foodDays)))} 天`);
 
-  // ---- 建设：每次最多立一个工地
-  if (rng.chance(0.4 + pers.build * 0.6)) {
+  // ---- 建设：每座城每次最多立一个工地
+  const prof = (id: string) => jobs.profIndex(id);
+  const PR = sim.world.get(Profession);
+  const have = (t: Town) => {
+    const c = new Array(jobs.professions.length).fill(0);
+    for (const e of pop.residents(t.id)) c[PR.prof[e]]++;
+    return c as number[];
+  };
+  const cityCount = towns.length + bld.sites.filter((s) => s.faction === fi && s.building === 'city').length;
+  if (rng.chance(0.5 + pers.build * 0.5)) {
     for (const t of towns) {
       if (bld.sites.some((s) => s.town === t.id)) continue;
       const w = stock(t, 'wood');
       const s = stock(t, 'stone');
       const b = (id: string) => t.buildings[id] ?? 0;
       let pick = '';
-      if (t.pop >= t.cap - 15 && w >= 40) pick = '房屋';
-      else if (!b('granary') && w >= 60 && s >= 20) pick = '仓库';
-      else if (foodDays(t) < 40 && b('farm') < 4 && w >= 20) pick = '农田';
+      if (b('farm') < 2 && w >= 20 && t.pop >= 3) pick = '农田';
+      else if (t.pop >= t.cap - 5 && w >= 40) pick = '房屋';
+      else if (!b('talent') && w >= 80 && stock(t, 'gold') >= 50) pick = '人才市场';
+      else if (!b('granary') && w >= 60 && s >= 20 && t.pop >= 15) pick = '仓库';
+      else if (foodDays(t) < 40 && b('farm') < 6 && w >= 20) pick = '农田';
       else if (pers.aggression > 0.6 && !b('barracks') && w >= 80 && s >= 40) pick = '兵营';
       else if (enemies.length && t.walls < 2 && s >= 120 && w >= 30) pick = '城墙';
       else if (stock(t, 'iron') >= 15 && !b('forge') && w >= 60 && s >= 60) pick = '铁匠铺';
-      else if (!b('market') && w >= 80 && stock(t, 'gold') < 500) pick = '市场';
-      if (pick) {
-        out.push(`建 ${pick} ${t.name}`);
-        break;
-      }
+      else if (!b('market') && w >= 80 && stock(t, 'gold') < 500 && t.pop >= 15) pick = '市场';
+      if (pick) out.push(`建 ${pick} ${t.name}${t.pop < 3 ? ' @建:2' : ''}`);
+    }
+  }
+
+  // ---- 招人：有人才市场的城，按职业缺口每天招满名额（留一点金和粮）
+  const WEIGHT: Record<string, number> = { farmer: 0.4, woodcutter: 0.2, mason: 0.08, miner: 0.04, builder: 0.1, smith: 0.03, porter: 0.04, soldier: 0.05 + pers.aggression * 0.25, scout: 0.02, merchant: 0.03 };
+  for (const t of towns) {
+    const b = (id: string) => t.buildings[id] ?? 0;
+    const left = tal.quotaLeft(t.id);
+    const room = t.cap - pop.residents(t.id).length;
+    if (!b('talent') || left <= 0 || room <= 0 || foodDays(t) < 6) continue;
+    const c = have(t);
+    let n = c.reduce((a, x) => a + x, 0);
+    let gold = stock(t, 'gold') - 60;
+    let food = stock(t, 'food') - 10 * eat(t);
+    const picks = new Map<string, number>();
+    const wantPorters = cityCount > 1 || (towns.length < 3 && b('talent')) ? 6 : 0;
+    for (let k = 0; k < Math.min(left, room); k++) {
+      let best = '';
+      let bestGap = 0.5; // 缺口不到半个人就不招
+      jobs.professions.forEach((p, i) => {
+        if (p.id === 'soldier' && !b('barracks')) return;
+        if (p.id === 'smith' && !b('forge')) return;
+        const price = tal.priceOf(i);
+        if (gold < (price['金'] ?? 0) || food < (price['粮'] ?? 0) || (price['铁'] ?? 0) > stock(t, 'iron')) return;
+        let gap = WEIGHT[p.id] * (n + 1) - c[i];
+        if (p.id === 'porter') gap = Math.max(gap, wantPorters - c[i] - 0.5 + 1);
+        if (gap > bestGap) ((best = p.id), (bestGap = gap));
+      });
+      if (!best) break;
+      const i = prof(best);
+      const price = tal.priceOf(i);
+      gold -= price['金'] ?? 0;
+      food -= price['粮'] ?? 0;
+      c[i]++;
+      n++;
+      picks.set(best, (picks.get(best) ?? 0) + 1);
+    }
+    if (picks.size) out.push(`募 ${t.name} ${[...picks].map(([id, k]) => `${jobs.professions[prof(id)].short}:${k}`).join(' ')}`);
+  }
+
+  // ---- 建城：都城有了人才市场、材料富余，就去占最近的空城址；新城没东西，派搬运工从都城运料过去
+  const empty = pop.towns.filter((t) => !t.founded);
+  const maxTowns = 2 + Math.round(pers.build * 2);
+  if (empty.length && cityCount < maxTowns && capital.buildings.talent && !bld.sites.some((s) => s.faction === fi && s.building === 'city') && pop.residents(capital.id).length >= 20) {
+    if (stock(capital, 'wood') >= 160 && stock(capital, 'stone') >= 60 && stock(capital, 'gold') >= 100 && foodDays(capital) > 20) {
+      const near = [...empty].sort((a, b) => Math.hypot(a.x - capital.x, a.y - capital.y) - Math.hypot(b.x - capital.x, b.y - capital.y))[0];
+      out.push(`建城 ${near.name} @建:2`);
+    }
+  }
+  mem.hauling ??= {};
+  const porters = have(capital)[prof('porter')];
+  for (const t of towns.slice(1)) {
+    const lacks = stock(t, 'wood') < 100 || stock(t, 'gold') < 100 || stock(t, 'food') < 80;
+    const surplus = foodDays(capital) > 20 && stock(capital, 'gold') > 150 && stock(capital, 'wood') > 150;
+    if (lacks && surplus && porters >= 6 && !mem.hauling[t.id]) {
+      for (const it of ['木头', '金', '粮食']) out.push(`运 @运@${capital.name}:2 ${it} ${capital.name} ${t.name}`);
+      mem.hauling[t.id] = true;
+    } else if (mem.hauling[t.id] && (!lacks || !surplus)) {
+      out.push(`放 @运@${capital.name}`);
+      mem.hauling[t.id] = false;
     }
   }
 

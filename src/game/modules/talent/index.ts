@@ -10,10 +10,12 @@ import type { Place } from '../world';
 import { PROFESSIONS } from '../../../../content/professions';
 
 export interface TalentApi {
-  /** 每座人才市场每天最多招几个 */
+  /** 每座人才市场每天恢复几个名额 */
   dailyLimit: number;
-  /** 这座城今天已经招了几个 */
-  hiredToday(town: number): number;
+  /** 名额最多攒几个（没用完的名额会攒着，因为诸侯不是每天都在想事情） */
+  maxBank: number;
+  /** 这座城的人才市场现在还剩几个名额 */
+  quotaLeft(town: number): number;
   /** 招一个人要付多少（职业序号 → 物品名 → 数量） */
   priceOf(prof: number): Record<string, number>;
 }
@@ -32,7 +34,8 @@ export const talent: GameModule = {
   name: '人才市场',
   requires: ['world', 'economy', 'population', 'jobs'],
   config: {
-    dailyLimit: { default: 5, text: '每座人才市场每天最多招几个人', min: 1, max: 1000 },
+    dailyLimit: { default: 5, text: '每座人才市场每天恢复几个招募名额', min: 1, max: 1000 },
+    bankDays: { default: 10, text: '招募名额最多攒几天的（诸侯不是每天都在想事情，没用完的名额会攒着）', min: 1, max: 100 },
   },
   events: [{ id: 'talent.hired', module: 'talent', text: '在人才市场招了人' }],
   hash(sim, mix) {
@@ -50,10 +53,23 @@ export const talent: GameModule = {
     const pop = api.use<PopulationApi>('population');
     const jobs = api.use<JobsApi>('jobs');
     const limit = api.config.dailyLimit as number;
+    const maxBank = limit * (api.config.bankDays as number);
+    /** 城镇 → 已经用掉的名额（从上限往下数，每天回 limit 个） */
     const used = new Map<number, number>();
+    const left = (t: number) => Math.max(0, maxBank - (used.get(t) ?? 0));
 
-    // 每天清零
-    sim.scheduler.add({ id: 'talent.daily', phase: 'population', every: 100, run: () => used.clear() }, 'talent');
+    // 每天恢复一天的名额
+    sim.scheduler.add(
+      {
+        id: 'talent.daily',
+        phase: 'population',
+        every: 100,
+        run() {
+          for (const [k, v] of [...used]) v - limit > 0 ? used.set(k, v - limit) : used.delete(k);
+        },
+      },
+      'talent',
+    );
 
     const commands: CommandDef[] = [
       {
@@ -84,8 +100,8 @@ export const talent: GameModule = {
           }
           if (!want.length) return { ok: false, msg: '没写招谁。例：募 ' + t.name + ' 农:3 木:2' };
           const total = want.reduce((s, [, n]) => s + n, 0);
-          const left = limit - (used.get(t.id) ?? 0);
-          if (total > left) return { ok: false, msg: `${t.name} 人才市场今天还能招 ${left} 人（每天 ${limit} 人），你要 ${total} 人` };
+          const quota = left(t.id);
+          if (total > quota) return { ok: false, msg: `${t.name} 人才市场现在只剩 ${quota} 个名额（每天恢复 ${limit} 个，最多攒 ${maxBank} 个），你要 ${total} 人` };
           const room = t.cap - pop.residents(t.id).length;
           if (total > room) return { ok: false, msg: `${t.name} 住不下：人口上限 ${t.cap}，还能住 ${Math.max(0, room)} 人（建房屋可以加上限）` };
           if (want.some(([p]) => PROFESSIONS[p].id === 'soldier') && !(t.buildings.barracks > 0)) return { ok: false, msg: `招士兵要先在 ${t.name} 建兵营` };
@@ -102,13 +118,13 @@ export const talent: GameModule = {
           t.pop += total;
           const list = want.map(([p, n]) => `${PROFESSIONS[p].name}${n}`).join('、');
           sim.events.emit('talent.hired', sim.clock.tick, { town: t.name, list, total, cost: price }, pop.factions[fi].name);
-          return { ok: true, msg: `${t.name} 招了 ${list}，花 ${Object.entries(price).map(([k, v]) => k + v).join('、')}；今天还能招 ${left - total} 人` };
+          return { ok: true, msg: `${t.name} 招了 ${list}，花 ${Object.entries(price).map(([k, v]) => k + v).join('、')}；还剩 ${quota - total} 个名额` };
         },
       },
     ];
     for (const c of commands) api.addCommand(c);
 
-    const ta: TalentApi = { dailyLimit: limit, hiredToday: (t) => used.get(t) ?? 0, priceOf: hirePrice };
+    const ta: TalentApi = { dailyLimit: limit, maxBank, quotaLeft: left, priceOf: hirePrice };
     Object.assign(ta, {
       _state: () => ({ used: [...used.entries()] }),
       _load(d: { used: [number, number][] }) {

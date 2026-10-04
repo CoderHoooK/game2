@@ -1,6 +1,7 @@
 // 简报：给 AI 诸侯看的「事实」——只有数字和发生过的事，没有任何指令或建议（怎么做由 AI 自己决定）。
 import type { Sim } from '../engine/sim';
-import type { EconomyApi, PopulationApi, JobsApi, DiplomacyApi, MilitaryApi, ChronicleApi, BuildingApi, Town } from '../game';
+import type { EconomyApi, PopulationApi, JobsApi, DiplomacyApi, MilitaryApi, ChronicleApi, BuildingApi, TalentApi, WorldApi, Town } from '../game';
+import { CITY } from '../../content/buildings';
 import { FOOD_PER_DAY } from '../../content/professions';
 
 export interface BriefingState {
@@ -13,12 +14,14 @@ const r = (n: number) => Math.round(n);
 
 export function buildBriefing(sim: Sim, faction: string, st: BriefingState, opts: { commands?: boolean } = {}): string {
   const eco = sim.service<EconomyApi>('economy');
+  const world = sim.service<WorldApi>('world');
   const pop = sim.service<PopulationApi>('population');
   const jobs = sim.service<JobsApi>('jobs');
   const dip = sim.service<DiplomacyApi>('diplomacy');
   const mil = sim.service<MilitaryApi>('military');
   const chr = sim.service<ChronicleApi>('chronicle');
   const bld = sim.service<BuildingApi>('building');
+  const tal = sim.service<TalentApi>('talent');
   const fi = pop.factionIndex(faction);
   const f = pop.factions[fi];
   const out: string[] = [];
@@ -34,8 +37,20 @@ export function buildBriefing(sim: Sim, faction: string, st: BriefingState, opts
     out.push(
       `- ${t.name}${t.capital ? '（都城）' : ''}：人口 ${t.pop}/${t.cap}，民心 ${r(t.mood)}，税 ${t.tax}%，城墙 ${t.walls}，` +
         `粮 ${r(item(t, 'food'))}（每天吃 ${r(eat)}，够 ${r(item(t, 'food') / Math.max(1, eat))} 天），木 ${r(item(t, 'wood'))}，石 ${r(item(t, 'stone'))}，铁 ${r(item(t, 'iron'))}，金 ${r(item(t, 'gold'))}，兵器 ${r(item(t, 'weapon'))}；` +
-        `建筑：${b}${sites ? `；工地：${sites}` : ''}`,
+        `建筑：${b}${sites ? `；工地：${sites}` : ''}` +
+        `${t.buildings.talent ? `；人才市场招募名额剩 ${tal.quotaLeft(t.id)}` : ''}`,
     );
+  }
+  out.push('', `## 招募（有人才市场的城才能募；士兵另需兵营；名额每天恢复 ${tal.dailyLimit} 个、最多攒 ${tal.maxBank} 个；自然出生率 0）`);
+  out.push(jobs.professions.map((p, i) => `${p.short}：${Object.entries(tal.priceOf(i)).map(([k, v]) => k + v).join(' ')}`).join('；'));
+  const empty = pop.towns.filter((t) => !t.founded);
+  if (empty.length) {
+    out.push('', `## 空城址（没人建城；建城要 ${Object.entries(CITY.cost).map(([k, v]) => eco.items[eco.itemIndex(k)].name + v).join('、')}，工作量 ${CITY.work}，新城的仓库和人口都是空的）`);
+    for (const t of empty) {
+      const near = pop.nearestTown(fi, t.x, t.y);
+      const racing = bld.sites.filter((s) => s.building === CITY.id && s.town === t.id).map((s) => pop.factions[s.faction].name);
+      out.push(`- ${t.name}：地区 ${world.map.regions[t.region].name}${near ? `，离 ${near.name} ${r(Math.hypot(near.x - t.x, near.y - t.y))} 米` : ''}${racing.length ? `；已有工地：${racing.join('、')}` : ''}`);
+    }
   }
   const counts = jobs.countByProf(fi);
   out.push('', '## 人手', jobs.professions.map((p, i) => `${p.short}${counts[i]}`).join(' ') + `（共 ${counts.reduce((a, b) => a + b, 0)}）`);

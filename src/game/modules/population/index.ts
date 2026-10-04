@@ -518,7 +518,7 @@ export const population: GameModule = {
             t.mood += (Math.max(0, Math.min(100, target)) - t.mood) * 0.12;
             t.relief *= 0.9;
             // 收税（市场加成）
-            st[gold] += res.length * t.tax * 0.004 * (1 + (t.buildings.market ?? 0) * 0.5);
+            st[gold] += res.length * t.tax * 0.02 * (1 + (t.buildings.market ?? 0) * 0.5);
             // 生孩子
             if (t.fed >= 0.999 && st[food] > res.length * 2 && t.mood > 40 && res.length < t.cap && res.length > 0) {
               const acc = (births.get(t.id) ?? 0) + res.length * growth * (t.mood / 60);
