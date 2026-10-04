@@ -93,6 +93,21 @@ export class Inspector {
     const moodColor = mood >= 60 ? '#4ade80' : mood >= 35 ? '#fbbf24' : '#f87171';
     const bname = (k: string) => this.defs.buildings.find((b) => b.id === k)?.name ?? k;
     const built = ts ? Object.entries(ts.buildings).filter(([, n]) => n > 0) : [];
+    if (ts && !ts.founded) {
+      const racing = ts.sites.length ? `<div class="sec">工地</div>${ts.sites.map((s) => `<div class="bar thin"><i style="width:${Math.round(s.progress * 100)}%"></i><span>${esc(s.name)} ${Math.round(s.progress * 100)}%</span></div>`).join('')}` : '';
+      this.el.innerHTML = `
+      <div class="ins-head">
+        <div class="avatar" style="--c:#9aa4b2"><b style="color:#9aa4b2">址</b></div>
+        <div><div class="ins-name">${esc(t.name)}</div><div class="dim">空城址 · 无主 · 没有人</div></div>
+        <span class="spacer"></span><button class="x" data-act="close">×</button>
+      </div>
+      <div class="dim small">还没人在这里建城。任何有城的诸侯都能占：材料 ${esc(this.defs.city.cost)}（从离这里最近的己方城出），工作量 ${this.defs.city.work}，建筑工去施工；别的诸侯也可能抢先建成。建成后城里没有人、仓库是空的。</div>
+      ${racing}
+      <div class="sec">试试</div>
+      <div class="cmds"><div class="cmd" data-act="fill" data-as="${esc(stats?.factions.find((x) => x.kind === 'lord' && x.alive)?.name ?? '')}" data-line="建城 ${esc(t.name)} @建:3"><code>建城 ${esc(t.name)} @建:3</code><span>立工地，派 3 个建筑工去</span></div></div>`;
+      this.el.hidden = false;
+      return;
+    }
     const siege = ts?.siege ? `<div class="alert">⚔ 被 <b style="color:${stats!.factions[ts.siege.by].color}">${esc(stats!.factions[ts.siege.by].name)}</b> 围城中 · ${Math.round(ts.siege.progress * 100)}%</div>` : '';
     this.el.innerHTML = `
       <div class="ins-head">
@@ -102,7 +117,8 @@ export class Inspector {
       </div>
       ${siege}
       <div class="bar" title="民心 0–100：吃饱、低税、开仓会升；断粮、高税会降。太低会有人逃走，长期很低会起义"><i style="width:${mood}%;background:${moodColor}"></i><span>民心 ${mood}</span></div>
-      <div class="dim small">税 ${ts?.tax ?? 10}% · 城墙 ${ts?.walls ?? 0} 层</div>
+      <div class="dim small">税 ${ts?.tax ?? 10}% · 城墙 ${ts?.walls ?? 0} 层 · 兵营 ${ts?.buildings.barracks ? '有' : '无'}</div>
+      ${ts?.recruit ? `<div class="dim small" title="没用完的名额会攒着，每天恢复 ${ts.recruit.daily} 个，最多攒 ${ts.recruit.max} 个">人才市场：招募名额 ${ts.recruit.left} / ${ts.recruit.max}</div>` : '<div class="dim small">没有人才市场（要先建，才能「募」人）</div>'}
       <div class="sec">仓库</div>
       <div class="stats">${this.defs.items.slice(0, 6).map((it, k) => `<div><b style="color:${it.color}">${fmt(stock[k] || 0)}</b><span>${esc(it.name)}</span></div>`).join('')}</div>
       <div class="sec">建筑</div>
@@ -112,6 +128,7 @@ export class Inspector {
       <div class="plist">${this.defs.professions.map((p, k) => `<div>${shapeSvg(p.shape, p.color, 12)}<span>${esc(p.name)}</span><b>${counts[k] || 0}</b></div>`).join('')}</div>
       <div class="sec">试试（以 ${esc(f.name)} 的身份）</div>
       <div class="cmds">
+        <div class="cmd" data-act="fill" data-as="${esc(f.name)}" data-line="${ts?.recruit ? '募 ' + esc(t.name) + ' 农:3 木:2' : '建 人才市场 ' + esc(t.name)}"><code>${ts?.recruit ? '募 ' + esc(t.name) + ' 农:3 木:2' : '建 人才市场 ' + esc(t.name)}</code><span>${ts?.recruit ? '花金和粮招人（士兵要兵营）' : '建了才能招人（木 80、金 50）'}</span></div>
         <div class="cmd" data-act="fill" data-as="${esc(f.name)}" data-line="建 房屋 ${esc(t.name)}"><code>建 房屋 ${esc(t.name)}</code><span>盖房子（木 40），人口上限 +30</span></div>
         <div class="cmd" data-act="fill" data-as="${esc(f.name)}" data-line="税 ${esc(t.name)} 5"><code>税 ${esc(t.name)} 5</code><span>减税，民心慢慢回升</span></div>
         <div class="cmd" data-act="fill" data-as="${esc(f.name)}" data-line="开仓 ${esc(t.name)} 200"><code>开仓 ${esc(t.name)} 200</code><span>开仓放粮，民心马上回升</span></div>

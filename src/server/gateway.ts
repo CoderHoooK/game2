@@ -7,7 +7,7 @@ import type { Sim } from '../engine/sim';
 import type { Source } from '../engine/commands/types';
 import type { WorldApi, EconomyApi, PopulationApi, JobsApi, MilitaryApi, ChronicleApi } from '../game';
 import type { AiHost } from '../ai';
-import { BUILDINGS } from '../../content/buildings';
+import { BUILDINGS, CITY } from '../../content/buildings';
 import { PROTOCOL_VERSION, type ClientMsg, type Defs, type LobbyMode, type ServerMsg, type SettingsMsg, type SettingValue } from '../protocol/messages';
 import { encodeChunk, encodeNodes, encodeTerrain, encodeTerritory } from '../protocol/codec';
 import { Interest, type View } from './interest';
@@ -49,11 +49,12 @@ export function buildDefs(sim: Sim): Defs {
     items: eco.items.map(({ id, name, color }) => ({ id, name, color })),
     professions: jobs.professions.map(({ id, name, short, color, shape, tags }) => ({ id, name, short, color, shape, tags })),
     factions: pop.factions.map(({ name, color }) => ({ name, color })),
-    towns: pop.towns.map(({ id, name, faction, capital, x, y, radius }) => ({ id, name, faction, capital, x, y, radius })),
+    towns: pop.towns.map(({ id, name, faction, capital, x, y, radius, founded }) => ({ id, name, faction, capital, x, y, radius, founded })),
     regions: world.map.regions.filter((r) => r.land).map((r) => ({ id: r.id, name: r.name, x: r.cx, y: r.cy, terrain: r.terrain })),
     behaviors: sim.brains.behaviors.map(({ id, name }) => ({ id, name })),
     commands: sim.bus.list().map((c) => ({ verb: c.verb, signature: sim.bus.signature(c), help: c.help, examples: c.examples, who: c.who, module: c.module })),
     buildings: BUILDINGS.map(({ id, name, text }) => ({ id, name, text })),
+    city: { cost: Object.entries(CITY.cost).map(([k, v]) => eco.items[eco.itemIndex(k)].name + v).join('、'), work: CITY.work },
   };
 }
 

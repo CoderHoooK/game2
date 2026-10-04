@@ -1,6 +1,6 @@
 // 前后端消息格式（共用同一份类型：改了一边，另一边编译就报错）。
 // 小而频繁的数据（单位位置、地形、资源点）走二进制，见 codec.ts；其余走 JSON。
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export interface Defs {
   seed: number;
@@ -15,12 +15,14 @@ export interface Defs {
   items: { id: string; name: string; color: string }[];
   professions: { id: string; name: string; short: string; color: string; shape: string; tags: string[] }[];
   factions: { name: string; color: string }[];
-  towns: { id: number; name: string; faction: number; capital: boolean; x: number; y: number; radius: number }[];
+  towns: { id: number; name: string; faction: number; capital: boolean; x: number; y: number; radius: number; /** false = 空城址（还没人建城） */ founded: boolean }[];
   regions: { id: number; name: string; x: number; y: number; terrain: number }[];
   /** 行为表：单位状态字节 = 下标 + 1（0 = 空闲） */
   behaviors: { id: string; name: string }[];
   commands: { verb: string; signature: string; help: string; examples: string[]; who: string[]; module: string }[];
   buildings: { id: string; name: string; text: string }[];
+  /** 建城：材料和工作量（给空城址面板显示） */
+  city: { cost: string; work: number };
 }
 
 export interface TownStat {
@@ -37,6 +39,8 @@ export interface TownStat {
   sites: { name: string; progress: number }[];
   /** false = 空城址（还没人建城，无主） */
   founded: boolean;
+  /** 有人才市场时：现在剩几个招募名额 / 最多攒几个 / 每天恢复几个 */
+  recruit?: { left: number; max: number; daily: number };
   /** 被围的进度 0–1（没被围 = 不写） */
   siege?: { by: number; progress: number };
 }

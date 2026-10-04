@@ -1,6 +1,6 @@
 // 每秒推一次的统计：库存、人手、城镇（民心 / 建筑 / 工地 / 围城）、势力、关系、新增史册。
 import type { Sim } from '../engine/sim';
-import { Identity, Profession, type EconomyApi, type JobsApi, type PopulationApi, type BuildingApi, type DiplomacyApi, type MilitaryApi, type ChronicleApi } from '../game';
+import { Identity, Profession, type EconomyApi, type JobsApi, type PopulationApi, type BuildingApi, type DiplomacyApi, type MilitaryApi, type ChronicleApi, type TalentApi } from '../game';
 import type { StatsMsg } from '../protocol/messages';
 
 export class StatsBuilder {
@@ -16,6 +16,7 @@ export class StatsBuilder {
     const dip = sim.service<DiplomacyApi>('diplomacy');
     const mil = sim.service<MilitaryApi>('military');
     const chr = sim.service<ChronicleApi>('chronicle');
+    const tal = sim.service<TalentApi>('talent');
     const I = sim.world.get(Identity);
     const PR = sim.world.get(Profession);
     const townCounts = pop.towns.map(() => jobs.professions.map(() => 0));
@@ -55,6 +56,7 @@ export class StatsBuilder {
         return {
           faction: t.faction,
           founded: t.founded,
+          recruit: t.buildings.talent ? { left: tal.quotaLeft(t.id), max: tal.maxBank, daily: tal.dailyLimit } : undefined,
           capital: t.capital,
           pop: t.pop,
           cap: t.cap,

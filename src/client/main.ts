@@ -119,7 +119,7 @@ function paintOwners(): void {
   const g = game!;
   const fs = stats?.factions ?? g.defs.factions;
   const colors = g.defs.towns.map((t, i) => fs[stats?.towns[i]?.faction ?? t.faction]?.color ?? '#999');
-  g.towns.recolor(colors);
+  g.towns.recolor(colors, g.defs.towns.map((t, i) => stats?.towns[i]?.founded ?? t.founded));
   g.territory.draw(fs);
   g.minimap.paint(colors, g.territory.visible ? g.territory.canvas : null, `${colors.join(',')}|${fs.length}|${g.territory.visible}|${g.territory.version}`);
 }
