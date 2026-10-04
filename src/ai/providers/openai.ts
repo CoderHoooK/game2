@@ -3,7 +3,7 @@ import type { ChatMessage, Provider } from './types';
 
 export class OpenAIProvider implements Provider {
   name: string;
-  constructor(private opts: { baseUrl: string; apiKey: string; model: string; timeoutMs?: number }) {
+  constructor(private opts: { baseUrl: string; apiKey: string; model: string; timeoutMs?: number; temperature?: number }) {
     this.name = `openai:${opts.model}`;
   }
   static fromEnv(env: Record<string, string | undefined>): OpenAIProvider | null {
@@ -17,10 +17,13 @@ export class OpenAIProvider implements Provider {
       const res = await fetch(this.opts.baseUrl.replace(/\/$/, '') + '/chat/completions', {
         method: 'POST',
         headers: { 'content-type': 'application/json', authorization: `Bearer ${this.opts.apiKey}` },
-        body: JSON.stringify({ model: this.opts.model, messages, temperature: 0.8 }),
+        body: JSON.stringify({ model: this.opts.model, messages, temperature: this.opts.temperature ?? 0.8 }),
         signal: ctl.signal,
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const body = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
+        throw new Error(`HTTP ${res.status}${body ? '：' + body : ''}`);
+      }
       const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
       return j.choices?.[0]?.message?.content ?? '';
     } finally {

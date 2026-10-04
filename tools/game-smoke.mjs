@@ -128,6 +128,22 @@ const townText = await page.$eval('#inspector', (el) => el.textContent);
 if (!/民心/.test(townText) || !/建筑/.test(townText)) fail('城镇面板没有民心 / 建筑');
 await shot('g-town-panel');
 
+// ⚙ 设置：只打开看看，不改、不开新局（不能动正在跑的世界）
+await page.click('#setBtn');
+await page.waitForSelector('#settings .srow', { timeout: 10000 });
+const set = await page.evaluate(() => ({
+  rows: document.querySelectorAll('#settings .srow').length,
+  keys: [...document.querySelectorAll('#settings .srow')].map((r) => r.dataset.key),
+  groups: [...document.querySelectorAll('#settings .sgroup h3')].map((h) => h.textContent),
+  secret: document.querySelector('[data-key="aiApiKey"] input')?.type,
+}));
+console.log(`设置面板：${set.rows} 项，${set.groups.length} 组`);
+for (const k of ['speed', 'aiMode', 'aiApiKey', 'seed', 'population.npcs', 'port']) if (!set.keys.includes(k)) fail(`设置面板缺 ${k}`);
+if (set.secret !== 'password') fail('API Key 输入框应该是密码框');
+await shot('g-settings');
+await page.keyboard.press('Escape');
+if (!(await page.$eval('#settings', (e) => e.hidden))) fail('Esc 没关掉设置面板');
+
 if (errors.length) fail('页面报错：\n' + errors.join('\n'));
 await browser.close();
 if (!process.exitCode) console.log('✓ 游戏冒烟测试通过');

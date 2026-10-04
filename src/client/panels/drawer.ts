@@ -114,7 +114,18 @@ export class Drawer {
       ['god', '☁ 上帝'],
     ];
     const body = this.tab === 'chronicle' ? this.renderChronicle() : this.tab === 'lords' ? this.renderLords() : this.tab === 'minds' ? this.renderMinds() : this.renderGod();
-    this.el.innerHTML = `<div class="dr-head">${tabs.map(([k, n]) => `<button class="tab ${k === this.tab ? 'on' : ''}" data-tab="${k}">${n}</button>`).join('')}<span class="spacer"></span><button class="x" data-act="close">×</button></div><div class="dr-body">${body}</div>`;
+    // 页签栏只建一次，之后只换内容区：每秒刷新时页签按钮不会被换掉（慢电脑上点页签不落空），滚动位置也保留
+    let bodyEl = this.el.querySelector<HTMLElement>('.dr-body');
+    if (!bodyEl) {
+      this.el.innerHTML = `<div class="dr-head">${tabs.map(([k, n]) => `<button class="tab" data-tab="${k}">${n}</button>`).join('')}<span class="spacer"></span><button class="x" data-act="close">×</button></div><div class="dr-body"></div>`;
+      bodyEl = this.el.querySelector<HTMLElement>('.dr-body')!;
+    }
+    for (const b of this.el.querySelectorAll<HTMLElement>('.dr-head .tab')) b.classList.toggle('on', b.dataset.tab === this.tab);
+    const sameTab = bodyEl.dataset.tab === this.tab;
+    const top = bodyEl.scrollTop;
+    bodyEl.innerHTML = body;
+    bodyEl.dataset.tab = this.tab;
+    if (sameTab) bodyEl.scrollTop = top;
   }
 
   private renderChronicle(): string {

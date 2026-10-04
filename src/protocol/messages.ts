@@ -1,6 +1,6 @@
 // 前后端消息格式（共用同一份类型：改了一边，另一边编译就报错）。
 // 小而频繁的数据（单位位置、地形、资源点）走二进制，见 codec.ts；其余走 JSON。
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 export interface Defs {
   seed: number;
@@ -118,6 +118,40 @@ export interface InspectInfo {
   components: Record<string, Record<string, unknown>>;
 }
 
+// ---------------------------------------------------------------- 设置（网页 ⚙ 设置面板）
+export type SettingValue = number | string | boolean;
+/** 什么时候生效：live 立即；world 开新局时；restart 重启服务器后 */
+export type SettingApply = 'live' | 'world' | 'restart';
+export interface SettingDef {
+  key: string;
+  group: string;
+  label: string;
+  help?: string;
+  type: 'number' | 'text' | 'bool' | 'select' | 'secret';
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: { value: string; label: string }[];
+  apply: SettingApply;
+  default: SettingValue;
+}
+export interface SettingsMsg {
+  t: 'settings';
+  defs: SettingDef[];
+  /** 当前值（密钥类一律给空串，看 secrets） */
+  values: Record<string, SettingValue>;
+  /** 密钥类：已设置时给打码后的样子（如 ••••abcd），没设置给空串 */
+  secrets: Record<string, string>;
+  /** 被环境变量锁定的项：key → 变量名（网页里改不了） */
+  locked: Record<string, string>;
+  /** 正在跑的世界是用哪些「新世界」设置生成的 */
+  world: Record<string, SettingValue>;
+  /** 改了但要重启服务器才生效的项 */
+  pendingRestart: string[];
+  /** 设置文件路径（给人看） */
+  file: string;
+}
+
 export type ServerMsg =
   | { t: 'hello'; v: number; defs: Defs }
   | StatsMsg
@@ -125,7 +159,11 @@ export type ServerMsg =
   | { t: 'inspect'; id: number; info: InspectInfo | null }
   /** 握手后补发最近的史册 */
   | { t: 'chronicle'; entries: ChronicleEntry[] }
-  | { t: 'ailog'; faction: string; personality: string; mode: string; logs: AiLogEntry[]; thoughts: { tick: number; text: string }[] };
+  | { t: 'ailog'; faction: string; personality: string; mode: string; logs: AiLogEntry[]; thoughts: { tick: number; text: string }[] }
+  | SettingsMsg
+  | { t: 'settings.result'; ok: boolean; msg: string }
+  /** 服务器要换世界了：页面会断开、重连、刷新 */
+  | { t: 'reload'; why: string };
 
 export type ClientMsg =
   | { t: 'view'; x0: number; y0: number; x1: number; y1: number }
@@ -134,4 +172,9 @@ export type ClientMsg =
   /** as = 势力名（以诸侯身份，调试用）；null = 上帝 */
   | { t: 'cmd'; id: number; line: string; as: string | null }
   /** 要某个诸侯席位的 AI 决策记录和心里话 */
-  | { t: 'ailog'; faction: string };
+  | { t: 'ailog'; faction: string }
+  /** 设置：取 / 改（只发改了的项；密钥类空串 = 不改，null = 清除）/ 用这些设置开新局 / 测试 AI 连接（可带没保存的值） */
+  | { t: 'settings' }
+  | { t: 'settings.set'; values: Record<string, SettingValue | null> }
+  | { t: 'settings.newWorld'; values?: Record<string, SettingValue | null> }
+  | { t: 'settings.testAi'; values?: Record<string, SettingValue | null> };

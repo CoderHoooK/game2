@@ -23,12 +23,17 @@ npm start            # 打包前端 + 启动服务 → http://localhost:8080
 - 游戏：http://localhost:8080 ；架构图谱：http://localhost:8080/atlas/
 - 操作：拖动平移、滚轮缩放、点小人 / 城镇看详情、`Home` 全图、`F` 跟随、`T` 领土、`J` 史册抽屉、`Enter` 或 `/` 输入命令、`Tab` 看可用命令
 - 网址参数：`?x=3690&y=4830&z=3` 直接看某处
-- 环境变量：`PORT`（8080）、`SEED`（1）、`NPCS`（2000）、`FRESH=1`（不读存档，开新局）、`SAVE`（存档路径，默认 `saves/auto.json.gz`，每 5 天和退出时自动存）、`AI=off`（关掉 AI 诸侯）
-- 大模型诸侯：`AI_BASE_URL`、`AI_API_KEY`、`AI_MODEL`（OpenAI 兼容接口；不配就用脚本诸侯，每 3 天想一次；大模型每 10 天一次，出急事提前醒）
+- **设置全在网页里**：顶栏「⚙ 设置」。存在 `saves/settings.json`（不进 git），分四组，每组标了什么时候生效：
+  - **时间与存档**（立即生效）：时间倍率、自动存档间隔
+  - **AI 诸侯**（立即生效）：脚本 / 大模型 / 关闭；接口地址、API Key、模型名、温度、超时、几天想一次；「测试 AI 连接」不用先保存就能试
+  - **新世界**（开新局时生效）：地图种子、开局人数、地图大小、地区网格、移动速度、采集速度、人口增长……（模块里声明的配置自动出现在这里）；点「用这些设置开新局」重新生成世界，旧档备份成 `auto.prev.json.gz`
+  - **服务器**（重启后生效）：端口、监听地址、存档文件
+  - 存档里记着生成它用的设置：改了新世界设置但不开新局，读档照旧
+- 环境变量仍然可用而且优先（网页上那一项会变灰并注明变量名）：`PORT`、`HOST`、`SEED`、`NPCS`、`SAVE`、`AI=off`、`AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL`；另有 `FRESH=1`（这次启动不读存档）、`SETTINGS`（设置文件路径）
 - 开发：`npm run dev:server` + `npm run dev:client`（前端热更新，http://localhost:5173）
 
 **打不开（HTTP ERROR 400 / 连不上）？** 多半是 8080 端口被别的软件占了，浏览器连到了那个软件。
-- 换个端口：`PORT=3000 npm start`（Windows PowerShell：`$env:PORT=3000; npm start`），打开 http://127.0.0.1:3000
+- 换个端口：`PORT=3000 npm start`（Windows PowerShell：`$env:PORT=3000; npm start`），打开 http://127.0.0.1:3000；想以后都用这个端口，进游戏后在「⚙ 设置 → 服务器」里改
 - 查是谁占的：Windows `netstat -ano | findstr :8080` 再 `tasklist /FI "PID eq 进程号"`；macOS / Linux `lsof -i :8080`
 - 确认连到的是游戏：`curl -I http://127.0.0.1:8080/` 能看到 `x-game: game2`
 - 服务器同时监听 IPv4 和 IPv6，端口被占会直接报错并提示，不会被悄悄抢走

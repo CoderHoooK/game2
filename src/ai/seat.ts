@@ -77,6 +77,24 @@ export class AiHost {
     }
   }
 
+  /** 运行中改设置（网页 ⚙ 设置）：换接口 / 关掉 / 改醒来间隔。换了模式的座位尽快醒一次 */
+  configure(opts: { provider?: Provider | null; scriptEvery?: number; llmEvery?: number; enabled?: boolean }): void {
+    this.opts = { ...this.opts, ...opts };
+    const mode = this.opts.provider ? 'llm' : 'script';
+    for (const s of this.seats.values()) {
+      if (s.mode === mode) continue;
+      s.mode = mode;
+      s.nextWake = Math.min(s.nextWake, this.sim.clock.tick + 20);
+      s.why = '换了 AI 设置';
+    }
+  }
+  get enabled(): boolean {
+    return this.opts.enabled !== false;
+  }
+  get providerName(): string {
+    return this.opts.enabled === false ? '关闭' : this.opts.provider ? this.opts.provider.name : '脚本';
+  }
+
   /** 同步座位：活着的诸侯都要有，灭亡的撤掉 */
   syncSeats(): void {
     const living = this.pop.livingFactions();

@@ -16,6 +16,7 @@ import { Inspector } from './panels/inspector';
 import { Console } from './panels/console';
 import { Minimap } from './panels/minimap';
 import { Legend } from './panels/legend';
+import { SettingsPanel } from './panels/settings';
 import { $, esc } from './util';
 
 interface Game {
@@ -42,11 +43,22 @@ const app = new Application();
 const world = new Container();
 const screen = new Container();
 
+let reloading = '';
+let settingsPanel: SettingsPanel | null = null;
 const net = new Net({
   hello(d) {
     defs = d;
   },
   json(m: ServerMsg) {
+    if (m.t === 'reload') {
+      // 服务器换了新世界：马上会断开，重连后整页刷新
+      reloading = m.why;
+      $('#loading').classList.add('show');
+      $('#loading span').textContent = m.why;
+      return;
+    }
+    if (m.t === 'settings') return settingsPanel?.show(m);
+    if (m.t === 'settings.result') return settingsPanel?.result(m.ok, m.msg);
     if (!game) return;
     if (m.t === 'stats') onStats(m);
     else if (m.t === 'result') game.console.result(m.id, m.ok, m.msg, m.warns, m.hint);
@@ -67,7 +79,7 @@ const net = new Net({
   },
   closed() {
     $('#loading').classList.add('show');
-    $('#loading span').textContent = '和服务器的连接断了，正在重连…';
+    $('#loading span').textContent = reloading || '和服务器的连接断了，正在重连…';
     const retry = () => {
       const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${location.pathname.replace(/[^/]*$/, '')}ws`);
       ws.onopen = () => location.reload();
@@ -177,6 +189,8 @@ async function start(d: Defs, terrainBuf: ArrayBuffer): Promise<void> {
     },
     follow: (on) => on && units.selected >= 0 && cam.zoom < 3 && cam.flyTo(cam.cx, cam.cy, 4),
   });
+  settingsPanel = new SettingsPanel((m) => net.send(m));
+  $('#setBtn').addEventListener('click', () => settingsPanel!.toggle());
   const consoleP = new Console(d, (id, line, as) => net.send({ t: 'cmd', id, line, as }));
   const minimap = new Minimap(d, terrain.overview, cam);
   const legend = new Legend(d, {

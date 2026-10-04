@@ -1,4 +1,5 @@
-// WebSocket 网关：握手发定义 + 地形 + 资源点；之后按视野推单位、每秒推统计；收命令 / 查人 / 要区块。
+// WebSocket 网关：握手发定义 + 地形 + 资源点；之后按视野推单位、每秒推统计；收命令 / 查人 / 要区块 / 设置。
+// 换世界（网页上开新局）：setWorld() → 通知所有页面、断开，页面自己重连刷新。
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'node:http';
 import type { Sim } from '../engine/sim';
@@ -6,9 +7,17 @@ import type { Source } from '../engine/commands/types';
 import type { WorldApi, EconomyApi, PopulationApi, JobsApi, MilitaryApi, ChronicleApi } from '../game';
 import type { AiHost } from '../ai';
 import { BUILDINGS } from '../../content/buildings';
-import { PROTOCOL_VERSION, type ClientMsg, type Defs, type ServerMsg, type StatsMsg } from '../protocol/messages';
+import { PROTOCOL_VERSION, type ClientMsg, type Defs, type ServerMsg, type SettingsMsg, type SettingValue, type StatsMsg } from '../protocol/messages';
 import { encodeChunk, encodeNodes, encodeTerrain, encodeTerritory } from '../protocol/codec';
 import { Interest, type View } from './interest';
+
+/** 设置相关的事交给宿主（main.ts）办 */
+export interface GatewayHost {
+  settings(): SettingsMsg;
+  setSettings(values: Record<string, SettingValue | null>): { ok: boolean; msg: string };
+  newWorld(values?: Record<string, SettingValue | null>): { ok: boolean; msg: string };
+  testAi(values?: Record<string, SettingValue | null>): Promise<{ ok: boolean; msg: string }>;
+}
 
 interface Client {
   ws: WebSocket;
@@ -44,18 +53,38 @@ export function buildDefs(sim: Sim): Defs {
 
 export class Gateway {
   private clients = new Set<Client>();
-  private interest: Interest;
-  private defs: Defs;
-  private world: WorldApi;
+  private interest!: Interest;
+  private defs!: Defs;
+  private world!: WorldApi;
   bytesOut = 0;
   /** 地形栅格；最高位 = 地区边界（陆地上），给前端画地区线 */
-  private terrainBuf: ArrayBuffer;
+  private terrainBuf!: ArrayBuffer;
 
   constructor(
     private sim: Sim,
     server: Server,
     private ai: AiHost | null = null,
+    private host: GatewayHost | null = null,
   ) {
+    this.bind(sim, ai);
+    const wss = new WebSocketServer({ server, path: '/ws' });
+    wss.on('connection', (ws) => this.onConnect(ws));
+  }
+
+  /** 换了一个新世界：通知所有页面，断开（页面会自己重连、刷新） */
+  setWorld(sim: Sim, ai: AiHost | null, why: string): void {
+    for (const c of this.clients) {
+      this.send(c, { t: 'reload', why });
+      c.ws.close(4001, 'new world');
+    }
+    this.clients.clear();
+    this.bind(sim, ai);
+  }
+
+  private bind(sim: Sim, ai: AiHost | null): void {
+    this.sim = sim;
+    this.ai = ai;
+    this.terrVersion = -1;
     this.world = sim.service<WorldApi>('world');
     this.defs = buildDefs(sim);
     this.interest = new Interest(sim, this.world.map.size);
@@ -68,8 +97,6 @@ export class Gateway {
         if ((i + 1 < res && region[k + 1] !== region[k]) || (j + 1 < res && region[k + res] !== region[k])) marked[k] |= 0x80;
       }
     this.terrainBuf = encodeTerrain(res, marked);
-    const wss = new WebSocketServer({ server, path: '/ws' });
-    wss.on('connection', (ws) => this.onConnect(ws));
   }
 
   private send(c: Client, m: ServerMsg | ArrayBuffer): void {
@@ -154,6 +181,27 @@ export class Gateway {
           // 暂停时也要让命令生效（比如"时速 1"）：立刻跑掉队列
           this.sim.bus.runQueued();
         }
+        break;
+      }
+      case 'settings':
+        if (this.host) this.send(c, this.host.settings());
+        break;
+      case 'settings.set': {
+        if (!this.host) break;
+        const r = this.host.setSettings(m.values || {});
+        this.send(c, { t: 'settings.result', ...r });
+        if (r.ok) this.send(c, this.host.settings()); // 失败时不刷新表单，免得用户填的东西没了
+        break;
+      }
+      case 'settings.newWorld': {
+        if (!this.host) break;
+        const r = this.host.newWorld(m.values);
+        this.send(c, { t: 'settings.result', ...r });
+        break;
+      }
+      case 'settings.testAi': {
+        if (!this.host) break;
+        void this.host.testAi(m.values).then((r) => this.send(c, { t: 'settings.result', ...r }));
         break;
       }
     }

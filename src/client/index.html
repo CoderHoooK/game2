@@ -21,6 +21,7 @@
         <button data-drawer="god" title="上帝命令">☁ 上帝</button>
         <button id="terrBtn" title="领土（T）">▦ 领土</button>
       </div>
+      <button class="btn ghost" id="setBtn" title="设置（时间、AI 诸侯、新世界、服务器）">⚙ 设置</button>
       <a class="btn ghost" href="./atlas/" target="_blank" rel="noopener">架构图谱 ↗</a>
     </header>
     <aside id="legend" class="panel"></aside>
@@ -38,6 +39,7 @@
     </section>
     <div id="minimapBox" class="panel"><canvas id="minimap" width="200" height="200"></canvas></div>
     <div id="hint">拖动平移 · 滚轮缩放 · 点小人 / 城镇看详情<br /><kbd>Home</kbd> 全图 <kbd>F</kbd> 跟随 <kbd>T</kbd> 领土 <kbd>J</kbd> 史册</div>
+    <div id="settings" hidden></div>
     <div id="toast"></div>
     <div id="loading"><div class="spin"></div><span>正在连接世界…</span></div>
     <script type="module" src="./main.ts"></script>
