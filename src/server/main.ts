@@ -91,7 +91,31 @@ for (const sig of ['SIGINT', 'SIGTERM'] as const)
     process.exit(0);
   });
 
-server.listen(PORT, '0.0.0.0', () => {
+// 同时监听 IPv4 和 IPv6（'::' 双栈）：浏览器的 localhost 常常先走 IPv6，
+// 只听 IPv4 的话，别的软件占着 IPv6 的同一端口时浏览器会连到它（比如看到 HTTP 400）。
+// 端口被占就直接报错退出，不会被悄悄抢走。HOST 可以指定只听某个地址。
+const HOST = process.env.HOST;
+let started = false;
+const listen = (host: string | undefined) => server.listen(PORT, host);
+server.on('listening', () => {
+  if (started) return;
+  started = true;
   console.log(`游戏服务：http://localhost:${PORT}   架构图谱：http://localhost:${PORT}/atlas/`);
+  console.log(`（打不开的话试试 http://127.0.0.1:${PORT}）`);
   loop();
 });
+server.prependListener('error', (err: NodeJS.ErrnoException) => {
+  if (!started && !HOST && (err.code === 'EAFNOSUPPORT' || err.code === 'EADDRNOTAVAIL')) {
+    listen('0.0.0.0'); // 机器不支持 IPv6：退回只听 IPv4
+    return;
+  }
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n端口 ${PORT} 已经被别的程序占用了。换个端口再启动：`);
+    console.error(`  macOS / Linux：PORT=3000 npm start`);
+    console.error(`  Windows PowerShell：$env:PORT=3000; npm start`);
+    console.error(`查是谁占的：Windows 用 netstat -ano | findstr :${PORT}，macOS / Linux 用 lsof -i :${PORT}\n`);
+    process.exit(1);
+  }
+  throw err;
+});
+listen(HOST ?? '::');

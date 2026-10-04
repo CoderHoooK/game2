@@ -17,6 +17,7 @@ export function createHttp(root: string, health: () => unknown): Server {
   const client = path.join(root, 'dist/client');
   const atlas = path.join(root, 'atlas');
   return createServer(async (req, res) => {
+    res.setHeader('x-game', 'game2'); // 用来确认连到的确实是游戏服务器（curl -I 能看到）
     const url = new URL(req.url || '/', 'http://x');
     let p = decodeURIComponent(url.pathname);
     if (p === '/healthz') {

@@ -27,6 +27,12 @@ npm start            # 打包前端 + 启动服务 → http://localhost:8080
 - 大模型诸侯：`AI_BASE_URL`、`AI_API_KEY`、`AI_MODEL`（OpenAI 兼容接口；不配就用脚本诸侯，每 3 天想一次；大模型每 10 天一次，出急事提前醒）
 - 开发：`npm run dev:server` + `npm run dev:client`（前端热更新，http://localhost:5173）
 
+**打不开（HTTP ERROR 400 / 连不上）？** 多半是 8080 端口被别的软件占了，浏览器连到了那个软件。
+- 换个端口：`PORT=3000 npm start`（Windows PowerShell：`$env:PORT=3000; npm start`），打开 http://127.0.0.1:3000
+- 查是谁占的：Windows `netstat -ano | findstr :8080` 再 `tasklist /FI "PID eq 进程号"`；macOS / Linux `lsof -i :8080`
+- 确认连到的是游戏：`curl -I http://127.0.0.1:8080/` 能看到 `x-game: game2`
+- 服务器同时监听 IPv4 和 IPv6，端口被占会直接报错并提示，不会被悄悄抢走
+
 命令示例（在命令框里，身份选"青龙"）：
 
 ```
