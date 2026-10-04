@@ -460,6 +460,7 @@ globalThis.ATLAS = {
     { id: 'diplomacy', name: '外交', icon: '🤝', requires: ['population', 'world', 'economy', 'jobs'], stage: 4, status: 'wip', summary: '私信、公开宣告、条约（不强制执行）、声望、送礼、贸易。', orders: ['trade'], actions: ['exchange'], events: ['message.received', 'treaty.proposed', 'treaty.signed', 'treaty.broken', 'treaty.expired', 'war.declared', 'war.ended'], wake: ['message.received', 'treaty.proposed', 'treaty.broken'], briefing: ['来信', '条约与声望'], save: '条约、声望、信件', views: ['relations', 'inbox'] },
     { id: 'chronicle', name: '史册', icon: '📜', requires: ['population'], stage: 4, status: 'wip', summary: '订阅所有事件，自动编年；按情报可见范围给各方看。', systems: ['记录事件'], briefing: ['近事'], views: ['chronicle', 'thoughts'], save: '史册', actions: [], events: [] },
     { id: 'god', name: '上帝', icon: '☁️', requires: ['world', 'economy', 'population', 'diplomacy', 'military', 'jobs'], stage: 5, status: 'wip', summary: '天灾、天降、冒名信、托梦、召唤流寇、时间倍率。诸侯只看得到后果。', events: ['god.intervened', 'disaster.struck'], views: ['god'], save: '干预记录', actions: [] },
+    { id: 'talent', name: '人才市场', icon: '🧑‍🤝‍🧑', requires: ['world', 'economy', 'population', 'jobs'], stage: 6, status: 'wip', summary: '自然出生默认关；在有人才市场的城里用「募」花金和粮招人，每天有名额，招士兵还要兵营。', events: ['talent.hired'], config: ['每座人才市场每天招募名额'], save: '当天各城已招人数', actions: [] },
   ],
 
   // ------------------------------------------------------------------ NPC 组件
@@ -575,6 +576,7 @@ globalThis.ATLAS = {
       help: '把一批人编成队伍，之后用 #队名 指挥', examples: ['编 @兵@青石城:20 一队'], status: 'done' },
     { id: 'build', verb: '建', module: 'building', who: ['lord'], order: 'build', args: [['建筑', 'building'], ['地点', 'place'], ['人?', 'sel']], help: '立工地（马上扣材料），建筑工会去施工；给了人就派他们专门去', examples: ['建 兵营 青石城', '建 城墙 青石城 @建:6', '建 伐木场 北林'], status: 'done' },
     { id: 'demolish', verb: '拆', module: 'building', who: ['lord'], args: [['建筑', 'building'], ['地点', 'place']], help: '拆掉一座建筑（退一半材料）；没建完的工地退全部材料', examples: ['拆 伐木场 北林'], status: 'done' },
+    { id: 'hire', verb: '募', module: 'talent', who: ['lord'], args: [['城镇', 'place'], ['名单', 'text']], help: '在有人才市场的城里招人：职业:人数，可以写好几个。花金和粮，每天有名额，招士兵还要兵营', examples: ['募 青石城 农:3 木:2'], status: 'done' },
     { id: 'attack', verb: '攻', module: 'military', who: ['lord'], order: 'attack', args: [['人', 'sel'], ['目标', 'target']], help: '进攻城镇或地区；对方没在交战就自动宣战（有条约会撕毁，掉声望）', examples: ['攻 #一队 赤焰.落霞镇', '攻 @兵:30 赤焰城'], status: 'done' },
     { id: 'guard', verb: '守', module: 'military', who: ['lord'], order: 'guard', args: [['人', 'sel'], ['地点', 'place']],
       help: '驻守某地', examples: ['守 #二队 青石城'], status: 'done' },
@@ -616,7 +618,7 @@ globalThis.ATLAS = {
     notables: ['李将军', '张谋士'],
     items: ['粮', '粮食', '木头', '石头', '铁', '金', '兵器', '工具'],
     works: { 伐木: 'woodcutter', 采石: 'mason', 挖矿: 'miner', 种田: 'farmer', 打铁: 'smith' },
-    buildings: ['房屋', '农田', '伐木场', '采石场', '矿场', '仓库', '兵营', '铁匠铺', '市场', '城墙', '道路'],
+    buildings: ['房屋', '农田', '伐木场', '采石场', '矿场', '仓库', '兵营', '铁匠铺', '市场', '城墙', '人才市场', '道路'],
     treaties: ['结盟', '互不侵犯', '朝贡', '通商', '借道'],
     disasters: ['旱', '涝', '疫', '蝗'],
   },

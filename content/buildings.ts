@@ -9,6 +9,7 @@ export const BUILDINGS: BuildingDef[] = [
   { id: 'forge', name: '铁匠铺', site: 'town', cost: { wood: 60, stone: 60 }, work: 240, max: 1, text: '本城铁匠打造速度 ×2' },
   { id: 'market', name: '市场', site: 'town', cost: { wood: 80 }, work: 200, max: 1, text: '每天按人口收金，商人交易多赚一半' },
   { id: 'granary', name: '仓库', site: 'town', cost: { wood: 60, stone: 20 }, work: 160, max: 2, text: '粮食每天少坏 50%（不建仓库每天坏 0.5%）' },
+  { id: 'talent', name: '人才市场', site: 'town', cost: { wood: 80, gold: 50 }, work: 200, max: 1, text: '本城可以用「募」花金和粮招人（每天有名额）；招士兵还要兵营' },
   { id: 'lumber', name: '伐木场', site: 'region', cost: { wood: 30 }, work: 100, max: 1, text: '本地区的林木恢复 ×3' },
   { id: 'quarry', name: '采石场', site: 'region', cost: { wood: 40 }, work: 140, max: 1, text: '本地区的石料恢复 ×3' },
   { id: 'mine', name: '矿场', site: 'region', cost: { wood: 50, stone: 20 }, work: 160, max: 1, text: '本地区的铁矿恢复 ×3' },

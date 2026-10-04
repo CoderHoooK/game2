@@ -123,6 +123,7 @@ describe('命令契约', () => {
   it('每条命令的每个例子都能跑通', () => {
     const s = createGame({ seed: 1, config: legacy() });
     for (const l of SETUP) expect(s.bus.exec(l, lord()).ok, l).toBe(true);
+    s.service<PopulationApi>('population').townByName('青石城')!.buildings.talent = 1; // 例子「募 青石城 …」要用
     expect(s.bus.exec('约 青龙 互不侵犯 30天', lord('赤焰')).ok).toBe(true);
     const fails: string[] = [];
     for (const c of s.bus.list()) {

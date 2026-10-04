@@ -17,7 +17,7 @@ export interface ProfessionDef {
   gathers?: string;
   tools: Record<string, number>;
   upkeep: Record<string, number>;
-  train: { cost: Record<string, number>; days: number };
+  train: { cost: Record<string, number>; days: number; /** 在人才市场招这种人要付的金（培训费里的金不再算） */ hire: number };
   text: string;
 }
 export const defineProfession = (p: ProfessionDef): ProfessionDef => p;

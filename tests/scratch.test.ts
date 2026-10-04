@@ -72,3 +72,53 @@ describe('从零开始的开局', () => {
     expect(back.hash()).toBe(s.hash());
   });
 });
+
+describe('人才市场与「募」', () => {
+  const lord = { role: 'lord' as const, faction: '青龙', origin: 'test' as const };
+  const setup = () => {
+    const s = createGame({ seed: 1 });
+    const { P, E } = parts(s);
+    const t = P.townByName('青石城')!;
+    const put = (item: string, n: number) => E.stores[t.store].stock[E.itemIndex(item)] += n;
+    const have = (item: string) => E.stores[t.store].stock[E.itemIndex(item)];
+    return { s, P, E, t, put, have };
+  };
+  it('没有人才市场不能募，说明原因', () => {
+    const { s } = setup();
+    const r = s.bus.exec('募 青石城 农:1', lord);
+    expect(r.ok).toBe(false);
+    expect(r.msg).toContain('人才市场');
+  });
+  it('建好人才市场就能募：扣金和粮、人口 +、职业对', () => {
+    const { s, P, t, have } = setup();
+    expect(s.bus.exec('建 人才市场 青石城 @建:3', lord).ok).toBe(true);
+    s.run(3000);
+    expect(t.buildings.talent ?? 0).toBe(1);
+    const gold = have('gold');
+    const food = have('food');
+    const before = P.residents(t.id).length;
+    const r = s.bus.exec('募 青石城 农:2 木:1', lord);
+    expect(r.ok, r.msg).toBe(true);
+    expect(P.residents(t.id).length).toBe(before + 3);
+    expect(have('gold')).toBeCloseTo(gold - 30, 0);
+    expect(have('food')).toBeLessThan(food - 8);
+  });
+  it('每天名额、人口上限、士兵要兵营、金不够：都整条拒绝', () => {
+    const { s, P, t, put } = setup();
+    t.buildings.talent = 1;
+    put('gold', 1000);
+    put('food', 1000);
+    expect(s.bus.exec('募 青石城 农:6', lord).msg).toContain('今天还能招 5 人');
+    expect(s.bus.exec('募 青石城 兵:1', lord).msg).toContain('兵营');
+    expect(s.bus.exec('募 青石城 农:5', lord).ok).toBe(true);
+    expect(s.bus.exec('募 青石城 农:1', lord).ok).toBe(false); // 今天满了
+    s.run(100); // 过一天，名额回来
+    const room = t.cap - P.residents(t.id).length;
+    t.cap -= room - 1; // 只剩 1 个位置
+    expect(s.bus.exec('募 青石城 农:2', lord).msg).toContain('住不下');
+    const { s: s2, t: t2, E: e2 } = setup();
+    t2.buildings.talent = 1;
+    e2.stores[t2.store].stock[e2.itemIndex('gold')] = 40;
+    expect(s2.bus.exec('募 青石城 商:5', lord).msg).toContain('付不起');
+  });
+});

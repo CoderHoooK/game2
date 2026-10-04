@@ -11,8 +11,9 @@ import { building } from './modules/building';
 import { diplomacy } from './modules/diplomacy';
 import { chronicle } from './modules/chronicle';
 import { god } from './modules/god';
+import { talent } from './modules/talent';
 
-export const MODULES: GameModule[] = [world, economy, population, jobs, building, diplomacy, military, chronicle, god];
+export const MODULES: GameModule[] = [world, economy, population, jobs, building, diplomacy, military, chronicle, god, talent];
 
 export function createGame(opts: SimOptions): Sim {
   return createSim(MODULES, opts);
@@ -25,6 +26,7 @@ export type { JobsApi, NpcInfo } from './modules/jobs';
 export type { BuildingApi, Site } from './modules/building';
 export type { DiplomacyApi, Message, Treaty } from './modules/diplomacy';
 export type { MilitaryApi, Intel } from './modules/military';
+export type { TalentApi } from './modules/talent';
 export type { ChronicleApi, Entry, Thought } from './modules/chronicle';
 export { Identity, Vitals, Notable } from './modules/population';
 export { Profession } from './modules/jobs';
