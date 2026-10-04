@@ -1,6 +1,6 @@
 // 前后端消息格式（共用同一份类型：改了一边，另一边编译就报错）。
 // 小而频繁的数据（单位位置、地形、资源点）走二进制，见 codec.ts；其余走 JSON。
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export interface Defs {
   seed: number;
@@ -152,6 +152,24 @@ export interface SettingsMsg {
   file: string;
 }
 
+// ---------------------------------------------------------------- 开始界面（服务器启动后先停在这里，网页里设置好才开局）
+/** 磁盘上的存档摘要（读得出来才有 label 等；读不出来给 error） */
+export interface SaveInfo {
+  /** 游戏内时间，如「第 2 年 夏 第 3 天」 */
+  label: string;
+  /** 存档时间（ISO） */
+  savedAt: string;
+  kb: number;
+  /** 生成这个世界用的种子 / NPC 数（旧档可能没有） */
+  seed?: number;
+  npcs?: number;
+  /** 有没有「开新局时备份的旧档」（清空存档时一起删） */
+  hasPrev: boolean;
+  /** 存档损坏 / 读不了：不能继续，但可以清空 */
+  error?: string;
+}
+export type LobbyMode = 'new' | 'continue';
+
 export type ServerMsg =
   | { t: 'hello'; v: number; defs: Defs }
   | StatsMsg
@@ -161,6 +179,8 @@ export type ServerMsg =
   | { t: 'chronicle'; entries: ChronicleEntry[] }
   | { t: 'ailog'; faction: string; personality: string; mode: string; logs: AiLogEntry[]; thoughts: { tick: number; text: string }[] }
   | SettingsMsg
+  /** 服务器还没开局（停在开始界面）：握手时代替 hello；save = null 表示没有存档 */
+  | { t: 'lobby'; save: SaveInfo | null }
   | { t: 'settings.result'; ok: boolean; msg: string }
   /** 服务器要换世界了：页面会断开、重连、刷新 */
   | { t: 'reload'; why: string };
@@ -177,4 +197,9 @@ export type ClientMsg =
   | { t: 'settings' }
   | { t: 'settings.set'; values: Record<string, SettingValue | null> }
   | { t: 'settings.newWorld'; values?: Record<string, SettingValue | null> }
-  | { t: 'settings.testAi'; values?: Record<string, SettingValue | null> };
+  | { t: 'settings.testAi'; values?: Record<string, SettingValue | null> }
+  /** 开始界面：开始（new = 用设置开新局，continue = 读存档继续；values = 表单里还没保存的改动）/ 清空存档 */
+  | { t: 'lobby.start'; mode: LobbyMode; values?: Record<string, SettingValue | null> }
+  | { t: 'lobby.clear' }
+  /** 游戏中：存档后回到开始界面 */
+  | { t: 'lobby.back' };

@@ -164,9 +164,15 @@ body.drawer-open #inspector { right: 420px; }
 @media (max-width: 1200px) { .news { display: none; } }
 @media (max-width: 900px) { #drawer { left: 10px; width: auto; } body.drawer-open #inspector { right: 10px; } }
 
-/* ⚙ 设置 */
+/* ⚙ 设置 / 开始界面 */
+#lobby { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 20%, #17294a 0%, var(--bg) 70%); }
+#lobby .sheet-head .logo { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: #0e7490; font-weight: 700; }
+.savecard { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(148, 163, 184, 0.06); }
+.savecard b { font-size: 14px; }
+.savecard .err { color: var(--bad); }
+.sheet-foot .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 #settings { position: fixed; inset: 0; z-index: 50; background: rgba(2, 6, 15, 0.55); display: grid; place-items: center; }
-#settings .sheet { width: min(860px, calc(100vw - 30px)); max-height: calc(100vh - 40px); display: flex; flex-direction: column; background: #0f1a2c; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+#settings .sheet, #lobby .sheet { width: min(860px, calc(100vw - 30px)); max-height: calc(100vh - 40px); display: flex; flex-direction: column; background: #0f1a2c; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
 .sheet-head, .sheet-foot { display: flex; align-items: center; gap: 10px; padding: 11px 16px; }
 .sheet-head { border-bottom: 1px solid var(--line); }
 .sheet-head b { font-size: 15px; }

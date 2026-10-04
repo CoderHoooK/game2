@@ -1,5 +1,6 @@
 // WebSocket 网关：握手发定义 + 地形 + 资源点；之后按视野推单位、每秒推统计；收命令 / 查人 / 要区块 / 设置。
 // 换世界（网页上开新局）：setWorld() → 通知所有页面、断开，页面自己重连刷新。
+// 还没开局（停在开始界面）时 sim = null：握手发 lobby 代替 hello，只处理设置和开始界面的消息。
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'node:http';
 import type { Sim } from '../engine/sim';
@@ -7,7 +8,7 @@ import type { Source } from '../engine/commands/types';
 import type { WorldApi, EconomyApi, PopulationApi, JobsApi, MilitaryApi, ChronicleApi } from '../game';
 import type { AiHost } from '../ai';
 import { BUILDINGS } from '../../content/buildings';
-import { PROTOCOL_VERSION, type ClientMsg, type Defs, type ServerMsg, type SettingsMsg, type SettingValue, type StatsMsg } from '../protocol/messages';
+import { PROTOCOL_VERSION, type ClientMsg, type Defs, type LobbyMode, type ServerMsg, type SettingsMsg, type SettingValue } from '../protocol/messages';
 import { encodeChunk, encodeNodes, encodeTerrain, encodeTerritory } from '../protocol/codec';
 import { Interest, type View } from './interest';
 
@@ -17,6 +18,11 @@ export interface GatewayHost {
   setSettings(values: Record<string, SettingValue | null>): { ok: boolean; msg: string };
   newWorld(values?: Record<string, SettingValue | null>): { ok: boolean; msg: string };
   testAi(values?: Record<string, SettingValue | null>): Promise<{ ok: boolean; msg: string }>;
+  /** 开始界面：存档摘要 / 开始（成功后宿主自己调 setWorld 换页面）/ 清空存档 / 游戏中回到开始界面 */
+  lobby(): Extract<ServerMsg, { t: 'lobby' }>;
+  start(mode: LobbyMode, values?: Record<string, SettingValue | null>): { ok: boolean; msg: string };
+  clearSaves(): { ok: boolean; msg: string };
+  backToLobby(): { ok: boolean; msg: string };
 }
 
 interface Client {
@@ -56,17 +62,20 @@ export class Gateway {
   private interest!: Interest;
   private defs!: Defs;
   private world!: WorldApi;
+  private sim: Sim | null = null;
+  private ai: AiHost | null = null;
   bytesOut = 0;
   /** 地形栅格；最高位 = 地区边界（陆地上），给前端画地区线 */
   private terrainBuf!: ArrayBuffer;
 
+  /** sim = null：还没开局，停在开始界面 */
   constructor(
-    private sim: Sim,
+    sim: Sim | null,
     server: Server,
-    private ai: AiHost | null = null,
+    ai: AiHost | null = null,
     private host: GatewayHost | null = null,
   ) {
-    this.bind(sim, ai);
+    if (sim) this.bind(sim, ai);
     const wss = new WebSocketServer({ server, path: '/ws' });
     wss.on('connection', (ws) => this.onConnect(ws));
   }
@@ -79,6 +88,17 @@ export class Gateway {
     }
     this.clients.clear();
     this.bind(sim, ai);
+  }
+
+  /** 世界没了（回到开始界面）：通知所有页面、断开，页面重连后会看到开始界面 */
+  unbind(why: string): void {
+    for (const c of this.clients) {
+      this.send(c, { t: 'reload', why });
+      c.ws.close(4001, 'lobby');
+    }
+    this.clients.clear();
+    this.sim = null;
+    this.ai = null;
   }
 
   private bind(sim: Sim, ai: AiHost | null): void {
@@ -120,8 +140,8 @@ export class Gateway {
   }
 
   private terrVersion = -1;
-  private territoryBuf(): ArrayBuffer {
-    const t = this.sim.service<MilitaryApi>('military').territory();
+  private territoryBuf(sim: Sim): ArrayBuffer {
+    const t = sim.service<MilitaryApi>('military').territory();
     this.terrVersion = t.version;
     return encodeTerritory(t.version, t.size, t.data);
   }
@@ -129,11 +149,6 @@ export class Gateway {
   private onConnect(ws: WebSocket): void {
     const c: Client = { ws, view: null, sent: 0 };
     this.clients.add(c);
-    this.send(c, { t: 'hello', v: PROTOCOL_VERSION, defs: this.defs });
-    this.send(c, this.terrainBuf);
-    this.send(c, this.nodesBuf());
-    this.send(c, this.territoryBuf());
-    this.send(c, { t: 'chronicle', entries: this.sim.service<ChronicleApi>('chronicle').entries('god').slice(-300) });
     ws.on('close', () => this.clients.delete(c));
     ws.on('message', (data, isBinary) => {
       if (isBinary) return;
@@ -145,9 +160,22 @@ export class Gateway {
       }
       this.onMessage(c, m);
     });
+    const sim = this.sim;
+    if (!sim) {
+      if (this.host) this.send(c, this.host.lobby());
+      return;
+    }
+    this.send(c, { t: 'hello', v: PROTOCOL_VERSION, defs: this.defs });
+    this.send(c, this.terrainBuf);
+    this.send(c, this.nodesBuf());
+    this.send(c, this.territoryBuf(sim));
+    this.send(c, { t: 'chronicle', entries: sim.service<ChronicleApi>('chronicle').entries('god').slice(-300) });
   }
 
   private onMessage(c: Client, m: ClientMsg): void {
+    if (this.onHostMessage(c, m)) return;
+    const sim = this.sim;
+    if (!sim) return; // 还没开局：下面都是游戏里的消息
     switch (m.t) {
       case 'view':
         c.view = { x0: +m.x0, y0: +m.y0, x1: +m.x1, y1: +m.y1 };
@@ -162,48 +190,70 @@ export class Gateway {
         break;
       }
       case 'inspect': {
-        const ok = this.sim.world.alive[m.id] === 1;
-        this.send(c, { t: 'inspect', id: m.id, info: ok ? (this.sim.service<JobsApi>('jobs').describe(m.id) as never) : null });
+        const ok = sim.world.alive[m.id] === 1;
+        this.send(c, { t: 'inspect', id: m.id, info: ok ? (sim.service<JobsApi>('jobs').describe(m.id) as never) : null });
         break;
       }
       case 'ailog': {
         const f = String(m.faction || '');
         const seat = this.ai?.seats.get(f);
-        const thoughts = this.sim.service<ChronicleApi>('chronicle').thoughts(f).slice(-50).map(({ tick, text }) => ({ tick, text }));
+        const thoughts = sim.service<ChronicleApi>('chronicle').thoughts(f).slice(-50).map(({ tick, text }) => ({ tick, text }));
         this.send(c, { t: 'ailog', faction: f, personality: seat?.personality.name ?? '', mode: seat ? seat.mode : this.ai ? '已灭亡' : 'AI 关闭', logs: (seat?.log ?? []).slice(-20), thoughts });
         break;
       }
       case 'cmd': {
         const src: Source = m.as ? { role: 'lord', faction: m.as, origin: 'ui' } : { role: 'god', origin: 'ui' };
-        const p = this.sim.bus.submit(String(m.line || ''), src, (r) => this.send(c, { t: 'result', id: m.id, ...r }));
+        const p = sim.bus.submit(String(m.line || ''), src, (r) => this.send(c, { t: 'result', id: m.id, ...r }));
         if (!p.ok) this.send(c, { t: 'result', id: m.id, ok: false, msg: p.error, hint: p.hint });
-        else if (this.sim.clock.speed === 0) {
+        else if (sim.clock.speed === 0) {
           // 暂停时也要让命令生效（比如"时速 1"）：立刻跑掉队列
-          this.sim.bus.runQueued();
+          sim.bus.runQueued();
         }
         break;
       }
+    }
+  }
+
+  /** 设置、开始界面的消息（有没有开局都能处理）；处理了返回 true */
+  private onHostMessage(c: Client, m: ClientMsg): boolean {
+    const host = this.host;
+    if (!host) return false;
+    switch (m.t) {
       case 'settings':
-        if (this.host) this.send(c, this.host.settings());
-        break;
+        this.send(c, host.settings());
+        return true;
       case 'settings.set': {
-        if (!this.host) break;
-        const r = this.host.setSettings(m.values || {});
+        const r = host.setSettings(m.values || {});
         this.send(c, { t: 'settings.result', ...r });
-        if (r.ok) this.send(c, this.host.settings()); // 失败时不刷新表单，免得用户填的东西没了
-        break;
+        if (r.ok) this.send(c, host.settings()); // 失败时不刷新表单，免得用户填的东西没了
+        return true;
       }
       case 'settings.newWorld': {
-        if (!this.host) break;
-        const r = this.host.newWorld(m.values);
+        const r = host.newWorld(m.values);
         this.send(c, { t: 'settings.result', ...r });
-        break;
+        return true;
       }
-      case 'settings.testAi': {
-        if (!this.host) break;
-        void this.host.testAi(m.values).then((r) => this.send(c, { t: 'settings.result', ...r }));
-        break;
+      case 'settings.testAi':
+        void host.testAi(m.values).then((r) => this.send(c, { t: 'settings.result', ...r }));
+        return true;
+      case 'lobby.start': {
+        const r = host.start(m.mode === 'continue' ? 'continue' : 'new', m.values);
+        this.send(c, { t: 'settings.result', ...r });
+        return true;
       }
+      case 'lobby.clear': {
+        const r = host.clearSaves();
+        this.send(c, { t: 'settings.result', ...r });
+        if (r.ok && !this.sim) this.send(c, host.lobby());
+        return true;
+      }
+      case 'lobby.back': {
+        const r = host.backToLobby();
+        if (!r.ok) this.send(c, { t: 'settings.result', ...r });
+        return true;
+      }
+      default:
+        return false;
     }
   }
 
@@ -216,6 +266,8 @@ export class Gateway {
 
   /** 每个循环步调用：ticked = 这一步有没有跑模拟 */
   step(stepNo: number, ticked: boolean): void {
+    const sim = this.sim;
+    if (!sim) return;
     for (const c of this.clients) {
       if (!ticked || !c.view) continue;
       // 看全图时单位很多：降到每秒 5 帧
@@ -227,13 +279,13 @@ export class Gateway {
       const buf = this.nodesBuf();
       for (const c of this.clients) this.send(c, buf);
     }
-    if (stepNo % 10 === 5 && this.sim.service<MilitaryApi>('military').territory().version !== this.terrVersion) {
-      const buf = this.territoryBuf();
+    if (stepNo % 10 === 5 && sim.service<MilitaryApi>('military').territory().version !== this.terrVersion) {
+      const buf = this.territoryBuf(sim);
       for (const c of this.clients) this.send(c, buf);
     }
   }
 
-  broadcast(m: StatsMsg): void {
+  broadcast(m: ServerMsg): void {
     for (const c of this.clients) this.send(c, m);
   }
 

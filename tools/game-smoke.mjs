@@ -1,4 +1,4 @@
-// 游戏冒烟测试：真浏览器打开游戏（先 npm start），看全图 → 拉近 → 点小人看详情 → 下命令 → 格子级近景。
+// 游戏冒烟测试：真浏览器打开游戏（先 npm start）→ 开始界面点开始 → 看全图 → 拉近 → 点小人看详情 → 下命令 → 格子级近景。
 // 需要 playwright + chromium；没装时退出码 2 = 没跑（不算通过）。
 // 用法：URL=http://localhost:8080/ ATLAS_SHOTS=/某目录 node tools/game-smoke.mjs
 let chromium;
@@ -29,6 +29,26 @@ const shot = async (name) => shots && (await page.screenshot({ path: `${shots}/$
 const ready = () => page.waitForFunction(() => window.__game && window.__game.stats(), null, { timeout: 30000 });
 
 await page.goto(base);
+// 服务器启动后先停在「开始界面」（没开局）：检查开始界面，再点开始；已经在游戏里（重复跑冒烟）就跳过
+await page.waitForFunction(() => (window.__game && window.__game.stats()) || document.querySelector('#lobby .srow'), null, { timeout: 30000 });
+if (await page.isVisible('#lobby')) {
+  const lobby = await page.evaluate(() => ({
+    keys: [...document.querySelectorAll('#lobby .srow')].map((r) => r.dataset.key),
+    acts: [...document.querySelectorAll('#lobby .sheet-foot [data-act]')].map((b) => b.dataset.act),
+    hasClose: !!document.querySelector('#lobby [data-close]'),
+  }));
+  console.log(`开始界面：${lobby.keys.length} 项设置，按钮 ${lobby.acts.join('/')}`);
+  for (const k of ['seed', 'population.npcs', 'aiMode']) if (!lobby.keys.includes(k)) fail(`开始界面缺 ${k}`);
+  if (lobby.keys.includes('port')) fail('开始界面不该显示需要重启的服务器设置');
+  if (lobby.hasClose) fail('开始界面不该能关掉');
+  if (!lobby.acts.includes('start')) fail('开始界面没有开始按钮');
+  await page.keyboard.press('Escape');
+  if (!(await page.isVisible('#lobby'))) fail('Esc 不该关掉开始界面');
+  if (await page.evaluate(() => !!window.__game)) fail('还没点开始，世界就已经在跑了');
+  await shot('g-lobby');
+  page.once('dialog', (d) => d.accept()); // 有存档时「开始新游戏」会确认覆盖
+  await page.click('#lobby [data-act="start"]');
+}
 await ready();
 await page.waitForTimeout(3500);
 const s0 = await page.evaluate(() => window.__game.stats());

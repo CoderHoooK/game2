@@ -45,6 +45,7 @@ const screen = new Container();
 
 let reloading = '';
 let settingsPanel: SettingsPanel | null = null;
+let lobbyPanel: SettingsPanel | null = null;
 const net = new Net({
   hello(d) {
     defs = d;
@@ -55,6 +56,16 @@ const net = new Net({
       reloading = m.why;
       $('#loading').classList.add('show');
       $('#loading span').textContent = m.why;
+      return;
+    }
+    if (m.t === 'lobby') {
+      // 服务器还没开局：显示开始界面（设置好才能开始；有存档可继续 / 清空）
+      $('#loading').classList.remove('show');
+      if (lobbyPanel) lobbyPanel.setSave(m.save);
+      else {
+        lobbyPanel = settingsPanel = new SettingsPanel((x) => net.send(x), $('#lobby'));
+        lobbyPanel.openLobby(m.save);
+      }
       return;
     }
     if (m.t === 'settings') return settingsPanel?.show(m);

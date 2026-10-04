@@ -6,7 +6,7 @@
     "start": "vite build && tsx src/server/main.ts",
     "serve": "tsx src/server/main.ts",
     "build": "vite build",
-    "dev:server": "tsx watch src/server/main.ts",
+    "dev:server": "tsx watch src/server/main.ts --autostart",
     "dev:client": "vite",
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run && node tools/check-atlas.mjs",

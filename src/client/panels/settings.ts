@@ -1,6 +1,7 @@
 // ⚙ 设置面板：表单完全由服务器发来的 SettingDef 生成（服务端加一项设置，这里不用改）。
 // 只把改过的项发回去；密钥类留空 = 不改。被环境变量锁定的项只读。
-import type { ClientMsg, SettingDef, SettingValue, SettingsMsg } from '../../protocol/messages';
+// 同一个面板还当「开始界面」用（lobby 模式）：服务器没开局时整页显示，设置好才能开始；有存档可继续，也可清空存档。
+import type { ClientMsg, SaveInfo, SettingDef, SettingValue, SettingsMsg } from '../../protocol/messages';
 import { $, esc, toast } from '../util';
 
 type Patch = Record<string, SettingValue | null>;
@@ -11,16 +12,23 @@ const APPLY: Record<SettingDef['apply'], [string, string]> = {
 };
 
 export class SettingsPanel {
-  private el = $('#settings');
   private msg: SettingsMsg | null = null;
   private clear = new Set<string>();
   private busy = false;
+  /** 点了开始：成功后服务器会换页面，别让按钮再亮起来 */
+  private starting = false;
   private last: { ok: boolean; text: string } | null = null;
+  /** 开始界面模式：不能关；save = 磁盘上的存档摘要（null = 没有） */
+  private lobby = false;
+  private save: SaveInfo | null = null;
 
-  constructor(private send: (m: ClientMsg) => void) {
+  constructor(
+    private send: (m: ClientMsg) => void,
+    private el: HTMLElement = $('#settings'),
+  ) {
     this.el.addEventListener('click', (ev) => {
       const t = ev.target as HTMLElement;
-      if (t === this.el || t.closest('[data-close]')) this.close();
+      if (!this.lobby && (t === this.el || t.closest('[data-close]'))) this.close();
       const act = t.closest<HTMLElement>('[data-act]')?.dataset.act;
       if (act) this.action(act);
       const clr = t.closest<HTMLElement>('[data-clear]')?.dataset.clear;
@@ -38,7 +46,7 @@ export class SettingsPanel {
       'keydown',
       (ev) => {
         if (!this.isOpen) return;
-        if (ev.key === 'Escape') this.close();
+        if (ev.key === 'Escape') this.lobby || this.close();
         else if (ev.key === 'Enter' && (ev.target as HTMLElement).tagName === 'INPUT') {
           ev.preventDefault();
           this.action('save');
@@ -59,7 +67,22 @@ export class SettingsPanel {
     this.el.innerHTML = `<div class="sheet"><div class="sheet-body"><div class="dim" style="padding:30px;text-align:center">读取设置…</div></div></div>`;
     this.send({ t: 'settings' });
   }
+  /** 开始界面：服务器还没开局，整页显示这个面板 */
+  openLobby(save: SaveInfo | null): void {
+    this.lobby = true;
+    this.save = save;
+    this.open();
+  }
+  /** 存档摘要变了（清空存档之后）：只重画存档区和按钮，表单里没保存的改动保留 */
+  setSave(save: SaveInfo | null): void {
+    this.save = save;
+    const box = this.el.querySelector('#lobbySave');
+    const foot = this.el.querySelector('.sheet-foot');
+    if (box) box.innerHTML = this.saveHtml();
+    if (foot) foot.innerHTML = this.footHtml();
+  }
   close(): void {
+    if (this.lobby) return;
     this.el.hidden = true;
   }
   toggle(): void {
@@ -75,7 +98,20 @@ export class SettingsPanel {
     const groups = new Map<string, SettingDef[]>();
     for (const d of m.defs) groups.set(d.group, [...(groups.get(d.group) ?? []), d]);
     const lockedN = Object.keys(m.locked).length;
-    this.el.innerHTML = `<div class="sheet" role="dialog" aria-label="设置">
+    const shown = this.lobby ? [...groups].filter(([, defs]) => defs[0].apply !== 'restart') : [...groups];
+    this.el.innerHTML = this.lobby
+      ? `<div class="sheet" role="dialog" aria-label="开始游戏">
+      <header class="sheet-head">
+        <span class="logo">诸</span><b>诸侯争霸 · 开始游戏</b>
+        <span class="dim small">先在这里设置好，再开始。设置存在 <code>${esc(m.file)}</code>${lockedN ? ` · ${lockedN} 项由环境变量指定（灰色，只读）` : ''}</span>
+      </header>
+      <div class="sheet-body">
+        <section class="sgroup" id="lobbySave">${this.saveHtml()}</section>
+        ${shown.map(([g, defs]) => `<section class="sgroup"><h3>${esc(g)}${badge(defs[0].apply)}</h3>${defs.map((d) => this.row(d)).join('')}</section>`).join('')}
+      </div>
+      <footer class="sheet-foot">${this.footHtml()}</footer>
+    </div>`
+      : `<div class="sheet" role="dialog" aria-label="设置">
       <header class="sheet-head">
         <b>⚙ 设置</b>
         <span class="dim small">存在 <code>${esc(m.file)}</code>${lockedN ? ` · ${lockedN} 项由环境变量指定（灰色，只读）` : ''}</span>
@@ -83,22 +119,47 @@ export class SettingsPanel {
         <button class="btn ghost" data-close title="关闭（Esc）">✕</button>
       </header>
       <div class="sheet-body">
-        ${[...groups].map(([g, defs]) => `<section class="sgroup"><h3>${esc(g)}${badge(defs[0].apply)}</h3>${defs.map((d) => this.row(d)).join('')}</section>`).join('')}
+        ${shown.map(([g, defs]) => `<section class="sgroup"><h3>${esc(g)}${badge(defs[0].apply)}</h3>${defs.map((d) => this.row(d)).join('')}</section>`).join('')}
       </div>
-      <footer class="sheet-foot">
-        <div id="setMsg" class="small ${this.last ? (this.last.ok ? 'ok' : 'err') : ''}">${this.last ? esc(this.last.text) : ''}</div>
-        <span class="spacer"></span>
-        <button class="btn ghost" data-act="test" title="用表单里的接口设置（不用先保存）发一句话试试">测试 AI 连接</button>
-        <button class="btn ghost danger" data-act="newWorld" title="保存后，用「新世界」设置重新生成世界">用这些设置开新局</button>
-        <button class="btn" data-act="save">保存</button>
-      </footer>
+      <footer class="sheet-foot">${this.footHtml()}</footer>
     </div>`;
     for (const d of m.defs) this.refreshRow(d.key);
   }
 
+  private saveHtml(): string {
+    const v = this.save;
+    if (!v) return `<h3>存档</h3><div class="savecard"><span class="dim">还没有存档 —— 设置好下面的选项，点右下角「开始游戏」。</span></div>`;
+    const when = v.savedAt ? new Date(v.savedAt).toLocaleString() : '';
+    const detail = [v.savedAt ? `存于 ${when}` : '', v.seed !== undefined ? `种子 ${v.seed}` : '', v.npcs !== undefined ? `${v.npcs} 人` : '', v.kb ? `${v.kb} KB` : '', v.hasPrev ? '另有旧档备份' : ''].filter(Boolean).join(' · ');
+    return `<h3>存档</h3><div class="savecard">
+      <b>${esc(v.label)}</b>
+      <span class="dim small">${esc(detail)}</span>
+      ${v.error ? `<span class="err small">${esc(v.error === '没有当前存档' ? '当前存档已不存在，只剩备份' : '存档读不了：' + v.error)}（可以清空存档后重新开始）</span>` : ''}
+    </div>`;
+  }
+
+  private footHtml(): string {
+    const msg = `<div id="setMsg" class="small ${this.last ? (this.last.ok ? 'ok' : 'err') : ''}">${this.last ? esc(this.last.text) : ''}</div><span class="spacer"></span>`;
+    const test = `<button class="btn ghost" data-act="test" title="用表单里的接口设置（不用先保存）发一句话试试">测试 AI 连接</button>`;
+    if (!this.lobby)
+      return `${msg}${test}
+        <button class="btn ghost danger" data-act="back" title="先存档，再回到开始界面（在那里可以清空存档、换设置重新开始）">回到开始界面</button>
+        <button class="btn ghost danger" data-act="newWorld" title="保存后，用「新世界」设置重新生成世界">用这些设置开新局</button>
+        <button class="btn" data-act="save">保存</button>`;
+    const v = this.save;
+    const canContinue = !!v && !v.error;
+    return `${msg}${test}
+      ${v ? `<button class="btn ghost danger" data-act="clear" title="删除存档和旧档备份（设置不动）">清空存档</button>` : ''}
+      ${canContinue ? `<button class="btn" data-act="continue" title="读取存档，接着玩（新世界设置以存档为准）">继续游戏</button>` : ''}
+      <button class="btn ${canContinue ? 'ghost danger' : ''}" data-act="start" title="${v ? '用上面的「新世界」设置开新局，覆盖现有存档（旧档备份成 .prev）' : '用上面的设置生成世界并开始'}">${v ? '开始新游戏' : '开始游戏'}</button>`;
+  }
+
   /** 保存 / 开新局 / 测试 的回复 */
   result(ok: boolean, text: string): void {
-    this.busy = false;
+    if (!(this.starting && ok)) {
+      this.busy = false;
+      this.starting = false;
+    }
     this.last = { ok, text };
     const box = this.el.querySelector('#setMsg');
     if (box) {
@@ -195,6 +256,20 @@ export class SettingsPanel {
       if (!confirm(`用这些设置重新生成世界？\n\n${list}\n\n当前世界会被替换（旧存档备份为 .prev.json.gz）。`)) return;
       this.busy = true;
       this.send({ t: 'settings.newWorld', values });
+    } else if (act === 'start' || act === 'continue') {
+      const v = this.save;
+      if (act === 'start' && v && !confirm(`已经有存档（${v.label}）。\n开始新游戏会覆盖它（旧档备份成 .prev.json.gz）。\n\n继续吗？`)) return;
+      this.busy = this.starting = true;
+      this.result(true, act === 'continue' ? '正在读取存档…' : '正在生成世界…');
+      this.send({ t: 'lobby.start', mode: act === 'continue' ? 'continue' : 'new', values });
+    } else if (act === 'clear') {
+      if (!confirm(`清空存档？\n\n当前存档${this.save ? `（${this.save.label}）` : ''}和旧档备份会被永久删除，不能恢复。\n设置不受影响。`)) return;
+      this.busy = true;
+      this.send({ t: 'lobby.clear' });
+    } else if (act === 'back') {
+      if (!confirm('回到开始界面？\n\n会先存一次档，然后停掉当前世界。在开始界面可以继续游戏、清空存档或换设置开新局。')) return;
+      this.busy = true;
+      this.send({ t: 'lobby.back' });
     } else if (act === 'test') {
       this.result(true, '正在连接…');
       this.busy = true;
