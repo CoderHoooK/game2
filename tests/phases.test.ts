@@ -17,10 +17,11 @@ import type { Sim } from '../src/engine/sim';
 import type { GameEvent } from '../src/engine/events';
 import { saveSim, loadSim } from '../src/engine/save';
 import { AiHost, buildBriefing, extractCommands, MAX_LINES, type Provider } from '../src/ai';
+import { legacy } from './helpers';
 
 const lord = (faction = '青龙') => ({ role: 'lord' as const, faction, origin: 'test' as const });
 const god = { role: 'god' as const, origin: 'test' as const };
-const small = (seed = 1, npcs = 600) => createGame({ seed, config: { population: { npcs } } });
+const small = (seed = 1, npcs = 600) => createGame({ seed, config: legacy(npcs) });
 
 function api(sim: Sim) {
   return {

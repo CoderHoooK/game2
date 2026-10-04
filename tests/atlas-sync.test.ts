@@ -5,6 +5,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { createGame, MODULES } from '../src/game';
+import { legacy } from './helpers';
 import { PHASES } from '../src/engine/scheduler';
 import { PROFESSIONS } from '../content/professions';
 
@@ -14,7 +15,7 @@ const ctx: Any = {};
 ctx.globalThis = ctx;
 vm.runInNewContext(readFileSync(path.join(ROOT, 'atlas/data.js'), 'utf8'), ctx);
 const A: Any = ctx.ATLAS;
-const sim = createGame({ seed: 1, config: { population: { npcs: 50 } } });
+const sim = createGame({ seed: 1, config: legacy(50) });
 const LIVE = new Set(['wip', 'done']);
 const byId = (list: Any[]) => new Map(list.map((x) => [x.id, x]));
 const same = (a: unknown[], b: unknown[]) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());

@@ -54,6 +54,7 @@ export class StatsBuilder {
         const s = sieges.get(t.id);
         return {
           faction: t.faction,
+          founded: t.founded,
           capital: t.capital,
           pop: t.pop,
           cap: t.cap,

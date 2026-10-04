@@ -1,10 +1,11 @@
 // 压测：不同人数下每拍耗时。用法：npm run bench [-- 2000 5000 10000]
 import { createGame } from '../src/game';
+import { legacy } from '../tests/helpers';
 
 const counts = process.argv.slice(2).map(Number).filter((n) => n > 0);
 for (const n of counts.length ? counts : [2000, 5000, 10000]) {
   let t = performance.now();
-  const sim = createGame({ seed: 1, config: { population: { npcs: n } } });
+  const sim = createGame({ seed: 1, config: legacy(n) });
   const create = performance.now() - t;
   sim.run(100);
   const N = 300;

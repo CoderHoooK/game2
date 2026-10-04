@@ -13,23 +13,23 @@ describe('设置', () => {
     const keys = new Set(settingEntries().map((e) => e.key));
     for (const m of MODULES) for (const k of Object.keys(m.config || {})) expect(keys.has(`${m.id}.${k}`)).toBe(true);
     for (const k of ['speed', 'autosaveDays', 'aiMode', 'aiApiKey', 'seed', 'port', 'host', 'savePath']) expect(keys.has(k)).toBe(true);
-    const npcs = settingEntries().find((e) => e.key === 'population.npcs')!;
-    expect(npcs.apply).toBe('world');
-    expect(npcs.default).toBe(2000);
+    const farmers = settingEntries().find((e) => e.key === 'population.startFarmer')!;
+    expect(farmers.apply).toBe('world');
+    expect(farmers.default).toBe(8);
   });
 
   it('优先级：默认 < 文件 < 环境变量；环境变量指定的项锁定', () => {
     const f = tmp();
-    writeFileSync(f, JSON.stringify({ seed: 5, 'population.npcs': 900, port: 3000, bogus: 1 }));
-    const s = new Settings(f, { NPCS: '1200' });
-    expect(s.get('seed')).toBe(5);
-    expect(s.get('population.npcs')).toBe(1200);
+    writeFileSync(f, JSON.stringify({ seed: 5, 'population.startFarmer': 9, port: 3000, bogus: 1 }));
+    const s = new Settings(f, { SEED: '12' });
+    expect(s.get('population.startFarmer')).toBe(9);
+    expect(s.get('seed')).toBe(12);
     expect(s.get('port')).toBe(3000);
     expect(s.get('autosaveDays')).toBe(5);
-    expect(s.isLocked('population.npcs')).toBe(true);
-    const r = s.set({ 'population.npcs': 50 });
-    expect(r.errors[0]).toContain('NPCS');
-    expect(s.set({ 'population.npcs': 1200 }).errors).toEqual([]); // 原样发回来不算改
+    expect(s.isLocked('seed')).toBe(true);
+    const r = s.set({ seed: 50 });
+    expect(r.errors[0]).toContain('SEED');
+    expect(s.set({ seed: 12 }).errors).toEqual([]); // 原样发回来不算改
   });
 
   it('AI 环境变量：AI=off → 关闭；三个 AI_* 都给 → 大模型', () => {
@@ -75,10 +75,10 @@ describe('设置', () => {
 
   it('新世界设置 → createGame 参数；重启类改了会提示', () => {
     const s = new Settings(tmp(), {});
-    s.set({ seed: 9, 'population.npcs': 300, port: 9000 });
+    s.set({ seed: 9, 'population.startFarmer': 30, port: 9000 });
     const w = s.worldValues();
     expect(Object.keys(w)).not.toContain('port');
-    expect(Settings.worldOptions(w)).toMatchObject({ seed: 9, config: { population: { npcs: 300 }, world: { size: 10000 } } });
+    expect(Settings.worldOptions(w)).toMatchObject({ seed: 9, config: { population: { startFarmer: 30 }, world: { size: 10000 } } });
     expect(s.toMsg(w).pendingRestart).toEqual(['port']);
   });
 

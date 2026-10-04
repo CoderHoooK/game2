@@ -228,7 +228,7 @@ export const diplomacy: GameModule = {
       let best: Town | undefined;
       let bd = Infinity;
       for (const t of pop.towns) {
-        if (t.faction === mine || !F[t.faction].alive) continue;
+        if (!t.founded || t.faction === mine || !F[t.faction].alive) continue;
         if (f ? t.faction !== f.index : F[t.faction].kind !== 'lord' && F[t.faction].kind !== 'rebel') continue;
         if (wars.has(key(mine, t.faction))) continue;
         const d = Math.hypot(t.x - P.x[e], t.y - P.y[e]) * (hasTreaty(mine, t.faction, 'trade') ? 0.6 : 1);

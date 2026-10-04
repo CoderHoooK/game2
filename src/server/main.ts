@@ -1,7 +1,7 @@
 // 宿主：读设置 → 建模拟 → 读档 → 固定每秒 10 步的主循环（每步按时间倍率跑 0–16 拍，拍与拍之间让 AI 诸侯想事）
 // → HTTP + WebSocket 同一个端口；按设置的间隔自动存档。
 // 所有设置都在网页「⚙ 设置」里改（存到 saves/settings.json，见 settings.ts）。
-// 环境变量仍然可用、而且优先：PORT、HOST、SEED、NPCS、SAVE、AI=off、AI_BASE_URL / AI_API_KEY / AI_MODEL；
+// 环境变量仍然可用、而且优先：PORT、HOST、SEED、SAVE、AI=off、AI_BASE_URL / AI_API_KEY / AI_MODEL；
 // 另外 FRESH=1（这次启动不读档）、SETTINGS（设置文件路径）。
 //
 // 启动后先停在「开始界面」（还没生成世界、不跑模拟）：网页里设置好，点「开始新游戏」或「继续游戏」才开局；

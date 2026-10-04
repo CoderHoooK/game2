@@ -1,13 +1,14 @@
 // 性能预算：2000 个 NPC 每拍 < 5 毫秒（10 拍/秒时只占半成 CPU，留给 AI 和网络）。
 import { describe, it, expect } from 'vitest';
 import { createGame } from '../src/game';
+import { legacy } from './helpers';
 
 const BUDGET_MS = 5;
 
 describe('性能', () => {
   it(`2000 个 NPC 每拍平均 < ${BUDGET_MS} ms，开局生成 < 3 秒`, () => {
     let t = performance.now();
-    const sim = createGame({ seed: 1 });
+    const sim = createGame({ seed: 1, config: legacy() });
     const createMs = performance.now() - t;
     sim.run(200);
     const N = 600;

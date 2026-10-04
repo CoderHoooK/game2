@@ -497,10 +497,13 @@ export const jobs: GameModule = {
         byTown.get(I.home[e])!.push(e);
       }
       for (const [, list] of [...byTown.entries()].sort((a, b) => a[0] - b[0])) {
-        const want = targetCounts(START_RATIO, list.length);
+        // 开局每座营地各职业几个人，由「新世界」设置给出（population.startCounts）；总数对不上时多的归最缺的职业
+        const want = new Map<number, number>();
+        for (const [id, n] of Object.entries(pop.startCounts)) if (n > 0) want.set(profIndex(id), n);
         // 前几个人（如"阿三"）留在原位，其余打乱
         const queue = [...list.slice(0, 3), ...rng.shuffle(list.slice(3))];
-        for (const [p, n] of want) for (let k = 0; k < n; k++) setProfession(queue.shift()!, p);
+        for (const [p, n] of [...want].sort((a, b) => a[0] - b[0])) for (let k = 0; k < n && queue.length; k++) setProfession(queue.shift()!, p);
+        while (queue.length) setProfession(queue.shift()!, profIndex('farmer'));
       }
       for (const e of pop.notables()) if (isFree(e)) sim.brains.setDefault(e, sim.brains.createOrder('idle', { place: townPlace(pop.towns[I.home[e]]) }, '隐居（在野）'));
     });

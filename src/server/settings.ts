@@ -60,7 +60,6 @@ export function settingEntries(): Entry[] {
         step: isNum ? (Number.isInteger(f.default) && (f.min === undefined || Number.isInteger(f.min)) ? 1 : 0.001) : undefined,
         default: f.default,
         apply: 'world',
-        env: m.id === 'population' && k === 'npcs' ? 'NPCS' : undefined,
       });
     }
   }

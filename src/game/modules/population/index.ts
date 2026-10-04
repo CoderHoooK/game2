@@ -11,8 +11,8 @@ import { Rng } from '../../../shared/rng';
 import type { Entity } from '../../../shared/types';
 import { Carry, type EconomyApi } from '../economy';
 import { T, type WorldApi } from '../world';
-import { FACTIONS, FIXED_PLACES, SURNAMES, GIVEN, FIXED_PEOPLE, START_STOCK, NOTABLES, BANDITS, REBEL_COLORS } from '../../../../content/factions';
-import { FOOD_PER_DAY } from '../../../../content/professions';
+import { FACTIONS, FIXED_PLACES, SURNAMES, GIVEN, FIXED_PEOPLE, START_DEFAULTS, NOTABLES, BANDITS, REBEL_COLORS } from '../../../../content/factions';
+import { FOOD_PER_DAY, PROFESSIONS } from '../../../../content/professions';
 
 export const Identity = defineComponent('Identity', '身份', { name: 'obj', faction: 'u8', home: 'u16' }, { name: '名字', faction: '势力', home: '所属城镇' });
 export const Vitals = defineComponent('Vitals', '血量', { hp: 'f32', maxHp: 'f32', hunger: 'f32' }, { hp: '当前', maxHp: '上限', hunger: '饿了几天（吃饱了慢慢恢复；2 天起掉血）' });
@@ -47,6 +47,8 @@ export interface Town {
   unrest: number;
   /** 人口（每天结算时更新） */
   pop: number;
+  /** false = 空城址：还没人建城，不属于任何势力、没有人、不参与结算（用「建城」占下才算数） */
+  founded: boolean;
 }
 export type FactionKind = 'lord' | 'rebel' | 'bandit' | 'free';
 export interface Faction {
@@ -88,6 +90,8 @@ export interface PopulationApi {
   /** 每人每天吃多少粮（jobs 按职业提供） */
   upkeepOf: (e: Entity) => number;
   livingFactions(kind?: FactionKind): Faction[];
+  /** 开局每个营地各职业的人数（职业 ID → 人数）；jobs 开局时照这个分职业 */
+  startCounts: Record<string, number>;
 }
 
 const TOWN_RADIUS = 45;
@@ -95,12 +99,24 @@ const MAX_FACTIONS = 24;
 
 export const population: GameModule = {
   id: 'population',
-  name: '人口',
+  name: '人口与开局',
   requires: ['world', 'economy'],
   components: [Identity, Vitals, Notable],
   config: {
-    npcs: { default: 2000, text: '开局 NPC 总数', min: 0, max: 60000 },
-    growth: { default: 0.004, text: '吃饱、民心好时每天的出生率', min: 0, max: 0.1 },
+    camps: { default: 1, text: '每个诸侯开局有几座营地（1–2；其余城址空着，要「建城」才算数）', min: 1, max: 2 },
+    startGold: { default: START_DEFAULTS.gold, text: '开局资金（金，每个诸侯）', min: 0, max: 1e6 },
+    startFood: { default: START_DEFAULTS.food, text: '开局粮食', min: 0, max: 1e6 },
+    startWood: { default: START_DEFAULTS.wood, text: '开局木材（建第一座房子、农田要用）', min: 0, max: 1e6 },
+    startStone: { default: START_DEFAULTS.stone, text: '开局石料', min: 0, max: 1e6 },
+    startIron: { default: START_DEFAULTS.iron, text: '开局铁', min: 0, max: 1e6 },
+    startWeapon: { default: START_DEFAULTS.weapon, text: '开局兵器', min: 0, max: 1e6 },
+    ...Object.fromEntries(
+      PROFESSIONS.map((p) => [`start${p.id[0].toUpperCase()}${p.id.slice(1)}`, { default: START_DEFAULTS.people[p.id] ?? 0, text: `开局${p.name}人数（每座营地）`, min: 0, max: 5000 }]),
+    ),
+    startFields: { default: 0, text: '开局营地边的田块数（0 = 没有，田要靠「农田」建筑，每座 +6 块）', min: 0, max: 200 },
+    campCap: { default: START_DEFAULTS.campCap, text: '营地人口上限（不低于开局人数；每座房屋 +30）', min: 1, max: 100000 },
+    lordNotables: { default: 0, text: '开局每个诸侯带将军和谋士（0 = 不带；在野名人不受影响）', min: 0, max: 1 },
+    growth: { default: 0, text: '吃饱、民心好时每天的自然出生率（0 = 关闭，人口只能靠人才市场招；原版 0.004）', min: 0, max: 0.1 },
   },
   views: [{ id: 'settlements', text: '城镇（位置、势力、库存、民心）' }],
   events: [
@@ -155,13 +171,17 @@ export const population: GameModule = {
   ],
   hash(sim, mix) {
     const pop = sim.service<PopulationApi>('population');
-    for (const t of pop.towns) (mix(t.faction), mix(Math.round(t.mood * 100)), mix(t.tax), mix(t.cap), mix(t.unrest));
+    for (const t of pop.towns) (mix(t.faction), mix(Math.round(t.mood * 100)), mix(t.tax), mix(t.cap), mix(t.unrest), mix(t.founded ? 1 : 0));
     for (const f of pop.factions) (mix(f.alive ? 1 : 0), mix(Math.round(f.reputation)));
   },
   save: {
-    version: 1,
+    // 2：城镇有 founded（从零开始版）。旧版（1）的世界是 12 座现成的城 + 2000 人，读不了
+    version: 2,
     save: (sim) => sim.service<PopulationApi & { _state(): unknown }>('population')._state(),
-    load: (sim, d) => sim.service<PopulationApi & { _load(d: unknown): void }>('population')._load(d),
+    load: (sim, d, version) => {
+      if (version < 2) throw new Error('存档是旧版本（开局就有 12 座城、2000 人），现在的「从零开始」读不了，请清空存档');
+      sim.service<PopulationApi & { _load(d: unknown): void }>('population')._load(d);
+    },
   },
   install(api) {
     const sim: Sim = api.sim;
@@ -172,7 +192,7 @@ export const population: GameModule = {
     const growth = api.config.growth as number;
     const d = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by);
     const newTown = (id: number, name: string, faction: number, capital: boolean, x: number, y: number, region: number, store: number): Town => ({
-      id, name, faction, capital, x, y, region, store, radius: TOWN_RADIUS, mood: 60, tax: 10, cap: 0, walls: 0, buildings: {}, fed: 1, relief: 0, unrest: 0, pop: 0,
+      id, name, faction, capital, x, y, region, store, radius: TOWN_RADIUS, mood: 60, tax: 10, cap: 0, walls: 0, buildings: {}, fed: 1, relief: 0, unrest: 0, pop: 0, founded: true,
     });
 
     // ---- 选城址：都城尽量互相远离，副城在都城 1.3–2.8 公里外
@@ -211,21 +231,31 @@ export const population: GameModule = {
     }
 
     const factions: Faction[] = FACTIONS.map((f, i) => ({ index: i, name: f.name, color: f.color, towns: [], kind: 'lord' as FactionKind, alive: true, reputation: 50 }));
+    // ---- 特殊势力：在野（名人、空城址）、流寇（上帝召唤）
+    factions.push({ index: factions.length, name: '在野', color: '#78716c', towns: [], kind: 'free', alive: true, reputation: 0 });
+    factions.push({ index: factions.length, name: BANDITS.name, color: BANDITS.color, towns: [], kind: 'bandit', alive: true, reputation: -100 });
+    const FREE = factions.length - 2;
+    const BANDIT = factions.length - 1;
+    const camps = api.config.camps as number;
     const towns: Town[] = [];
     FACTIONS.forEach((f, i) => {
       [capitals[i], seconds[i]].forEach((r, k) => {
-        const t: Town = newTown(towns.length, f.towns[k], i, k === 0, r.cx, r.cy, r.id, 0);
+        // 前 camps 座是开局的营地；其余是空城址（无主，要「建城」）
+        const founded = k < camps;
+        const t: Town = newTown(towns.length, f.towns[k], founded ? i : FREE, founded && k === 0, r.cx, r.cy, r.id, 0);
+        t.founded = founded;
         t.store = eco.addStore(t.name, t.x, t.y, t.radius);
         towns.push(t);
-        factions[i].towns.push(t.id);
-        world.addPlace({ name: t.name, kind: 'town', id: t.id, x: t.x, y: t.y, region: r.id, faction: f.name });
+        if (founded) factions[i].towns.push(t.id);
+        world.addPlace({ name: t.name, kind: 'town', id: t.id, x: t.x, y: t.y, region: r.id, faction: founded ? f.name : factions[FREE].name });
       });
     });
 
-    // ---- 城边的田；附近没树林的给几片小树林（每座城都缺点什么，但不至于没柴烧）
+    // ---- 营地边的田（默认 0：田要靠「农田」建筑）；附近没树林的给几片小树林（每座城都缺点什么，但不至于没柴烧）
+    const fieldsN = api.config.startFields as number;
     for (const t of towns) {
-      for (let k = 0; k < 18; k++) {
-        const a = (k / 18) * Math.PI * 2 + rng.range(-0.15, 0.15);
+      for (let k = 0; t.founded && k < fieldsN; k++) {
+        const a = (k / fieldsN) * Math.PI * 2 + rng.range(-0.15, 0.15);
         const r = rng.range(70, 200);
         const x = t.x + Math.cos(a) * r;
         const y = t.y + Math.sin(a) * r;
@@ -263,13 +293,16 @@ export const population: GameModule = {
       }
     }
 
-    // ---- 开局库存（都城翻倍）
-    for (const t of towns) eco.give(t.store, Object.entries(START_STOCK).map(([k, v]) => [k, t.capital ? v * 2 : v]));
-    // ---- 特殊势力：在野（名人）、流寇（上帝召唤）
-    factions.push({ index: factions.length, name: '在野', color: '#78716c', towns: [], kind: 'free', alive: true, reputation: 0 });
-    factions.push({ index: factions.length, name: BANDITS.name, color: BANDITS.color, towns: [], kind: 'bandit', alive: true, reputation: -100 });
-    const FREE = factions.length - 2;
-    const BANDIT = factions.length - 1;
+    // ---- 开局物资：每座营地一份（空城址什么都没有）
+    const startStock: [string, number][] = [
+      ['gold', api.config.startGold as number],
+      ['food', api.config.startFood as number],
+      ['wood', api.config.startWood as number],
+      ['stone', api.config.startStone as number],
+      ['iron', api.config.startIron as number],
+      ['weapon', api.config.startWeapon as number],
+    ];
+    for (const t of towns) if (t.founded) eco.give(t.store, startStock.filter(([, n]) => n > 0));
 
     // ---- NPC
     const W = sim.world;
@@ -304,24 +337,26 @@ export const population: GameModule = {
       dirty = true;
       return e;
     };
-    const total = api.config.npcs as number;
-    const weights = towns.map((t) => (t.capital ? 3 : 2));
-    const wsum = weights.reduce((a, b) => a + b, 0);
-    const counts = weights.map((w) => Math.floor((total * w) / wsum));
-    for (let i = 0; counts.reduce((a, b) => a + b, 0) < total; i++) counts[i % towns.length]++;
+    // 开局每座营地的人：按职业人数生成（职业由 jobs 在开局时按 startCounts 分）
+    const startCounts: Record<string, number> = {};
+    for (const p of PROFESSIONS) startCounts[p.id] = api.config[`start${p.id[0].toUpperCase()}${p.id.slice(1)}`] as number;
+    const perCamp = Object.values(startCounts).reduce((a, b) => a + b, 0);
     const fixed = [...FIXED_PEOPLE];
-    towns.forEach((t, i) => {
-      for (let k = 0; k < counts[i]; k++) spawn(t, t.id === 0 ? fixed.shift() : undefined);
-      t.cap = Math.ceil(counts[i] * 1.25) + 20;
-      t.pop = counts[i];
-    });
-    // 名人：在所属势力的都城出生；在野的在地图中部的城附近游荡
+    for (const t of towns) {
+      if (!t.founded) continue;
+      for (let k = 0; k < perCamp; k++) spawn(t, t.id === 0 ? fixed.shift() : undefined);
+      t.cap = Math.max(api.config.campCap as number, perCamp);
+      t.pop = perCamp;
+    }
+    // 名人：诸侯的将军谋士在都城出生（默认不带）；在野的在地图上某座已建的城附近游荡
     const titles = new Map<Entity, string>();
     const factionIndex = (name: string) => factions.findIndex((f) => f.name === name);
+    const foundedTowns = towns.filter((t) => t.founded);
     for (const n of NOTABLES) {
+      if (n.faction && !api.config.lordNotables) continue;
       const fi = n.faction ? factionIndex(n.faction) : FREE;
       if (fi < 0) continue;
-      const home = n.faction ? towns[factions[fi].towns[0]] : towns[rng.int(towns.length)];
+      const home = n.faction ? towns[factions[fi].towns[0]] : foundedTowns[rng.int(foundedTowns.length)];
       const e = spawn(home, n.name, fi);
       W.add(e, Notable, { loyalty: n.loyalty, ambition: n.ambition });
       N.traits[e] = [n.title, ...n.traits];
@@ -420,6 +455,7 @@ export const population: GameModule = {
       onSpawn,
       onRehome,
       upkeepOf: () => FOOD_PER_DAY,
+      startCounts,
       livingFactions: (kind) => factions.filter((f) => f.alive && (kind ? f.kind === kind : f.kind === 'lord' || f.kind === 'rebel')),
     };
     const food = eco.itemIndex('food');
@@ -441,6 +477,7 @@ export const population: GameModule = {
             byTown.get(I.home[e])!.push(e);
           }
           for (const t of towns) {
+            if (!t.founded) continue; // 空城址
             const res = byTown.get(t.id) || [];
             t.pop = res.length;
             const st = eco.stores[t.store].stock;
@@ -480,7 +517,7 @@ export const population: GameModule = {
             if (t.mood < 25 && res.length > 5) {
               const n = Math.max(1, Math.floor(res.length * 0.02));
               const mine = factions[t.faction].towns.map((i) => towns[i]).filter((o) => o !== t && o.mood > t.mood + 15);
-              const others = towns.filter((o) => o.faction !== t.faction && o.mood > 50 && factions[o.faction].alive);
+              const others = towns.filter((o) => o.founded && o.faction !== t.faction && o.mood > 50 && factions[o.faction].alive);
               const dest = (mine.length ? mine : others).sort((a, b) => d(a.x, a.y, t.x, t.y) - d(b.x, b.y, t.x, t.y))[0];
               if (dest) {
                 const movers = rng.shuffle(res.filter((e) => !N.has[e])).slice(0, n);
@@ -596,7 +633,7 @@ export const population: GameModule = {
     Object.assign(pa, {
       _state: () => ({
         rng: rng.state,
-        towns: towns.map(({ id, faction, capital, mood, tax, cap, walls, buildings, fed, relief, unrest, pop }) => ({ id, faction, capital, mood, tax, cap, walls, buildings, fed, relief, unrest, pop })),
+        towns: towns.map(({ id, faction, capital, mood, tax, cap, walls, buildings, fed, relief, unrest, pop, founded }) => ({ id, faction, capital, mood, tax, cap, walls, buildings, fed, relief, unrest, pop, founded })),
         factions: factions.map((f) => ({ ...f })),
         titles: [...titles.entries()],
         births: [...births.entries()],

@@ -60,8 +60,17 @@ export function describeSave(file: string): SaveInfo | null {
     const b = readSave(file)!;
     const clock = new Clock();
     clock.tick = b.sim.tick;
-    const npcs = (b.world?.['population.npcs'] as number | undefined) ?? undefined;
-    return { label: clock.label(), savedAt: b.savedAt, kb, seed: b.sim.seed, npcs, hasPrev: prev };
+    // 人口模块存档版本 < 2 = 旧版世界（12 座现成的城 + 2000 人），现在读不了
+    const old = (b.sim.modules?.population?.version ?? 0) < 2;
+    return {
+      label: clock.label(),
+      savedAt: b.savedAt,
+      kb,
+      seed: b.sim.seed,
+      npcs: b.sim.world?.count,
+      hasPrev: prev,
+      error: old ? '存档是旧版本（开局就有 12 座城、2000 人），现在的「从零开始」读不了' : undefined,
+    };
   } catch (err) {
     return { label: '（存档读不了）', savedAt: '', kb, hasPrev: prev, error: (err as Error).message };
   }

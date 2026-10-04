@@ -5,12 +5,13 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { createGame, MODULES } from '../src/game';
+import { legacy } from '../tests/helpers';
 import { PROFESSIONS } from '../content/professions';
 
 type Any = Record<string, any>;
 const FILE = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../atlas/data.js');
 let text = readFileSync(FILE, 'utf8');
-const sim = createGame({ seed: 1, config: { population: { npcs: 50 } } });
+const sim = createGame({ seed: 1, config: legacy(50) });
 const LIVE = new Set(['wip', 'done']);
 const union = (a: string[] = [], b: string[] = []) => [...a, ...b.filter((x) => !a.includes(x))];
 const changes: string[] = [];

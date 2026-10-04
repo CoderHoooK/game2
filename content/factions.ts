@@ -23,8 +23,20 @@ export const GIVEN = '大小二三四五六七八九春夏秋冬山水石木金�
 /** 青龙最先出生的几个人（命令例子里的"阿三"等） */
 export const FIXED_PEOPLE = ['阿三', '阿四', '老王'];
 
-/** 开局每座城的库存（都城翻倍）：物品 ID → 数量 */
-export const START_STOCK: Record<string, number> = { food: 400, wood: 150, stone: 80, iron: 20, gold: 300, weapon: 20 };
+/** 开局每个诸侯的营地：物资和各职业人数的默认值（网页「新世界」设置里改；键 = 设置名去掉 population. 前缀） */
+export const START_DEFAULTS = {
+  /** 物资 */
+  gold: 200,
+  food: 300,
+  wood: 200,
+  stone: 60,
+  iron: 0,
+  weapon: 0,
+  /** 各职业开局人数（职业 ID → 人数） */
+  people: { farmer: 8, woodcutter: 4, builder: 3 } as Record<string, number>,
+  /** 营地人口上限（房屋每座 +30） */
+  campCap: 20,
+};
 
 /** 流寇：上帝召唤的无主势力，不占城、见人就打 */
 export const BANDITS = { name: '流寇', color: '#57534e' };

@@ -419,7 +419,7 @@ export const military: GameModule = {
     let terrVersion = 0;
     let terrKey = '';
     const rebuildTerritory = () => {
-      const k = pop.towns.map((t) => t.faction).join(',');
+      const k = pop.towns.map((t) => (t.founded ? t.faction : -1)).join(',');
       if (k === terrKey) return;
       terrKey = k;
       const cs = size / TERR;
@@ -430,6 +430,7 @@ export const military: GameModule = {
           let best = 255;
           let bd = TERR_RANGE * TERR_RANGE;
           for (const t of pop.towns) {
+            if (!t.founded) continue; // 空城址不占领土
             const d = (t.x - px) ** 2 + (t.y - py) ** 2;
             if (d < bd) ((bd = d), (best = t.faction));
           }
@@ -458,6 +459,7 @@ export const military: GameModule = {
             return;
           }
           for (const t of pop.towns) {
+            if (!t.founded) continue;
             const r = t.radius + 60;
             const count = new Map<number, number>();
             let defenders = 0;
@@ -521,7 +523,7 @@ export const military: GameModule = {
         let best: Town | undefined;
         let bd = Infinity;
         for (const t of pop.towns) {
-          if (now - (looted.get(t.id) ?? -1e9) < 500) continue;
+          if (!t.founded || now - (looted.get(t.id) ?? -1e9) < 500) continue;
           const d = (t.x - P.x[e]) ** 2 + (t.y - P.y[e]) ** 2;
           if (d < bd) ((bd = d), (best = t));
         }
@@ -580,7 +582,7 @@ export const military: GameModule = {
             if (PR.prof[e] !== SCOUT) continue;
             const fe = I.faction[e];
             for (const t of pop.towns) {
-              if (t.faction === fe || (t.x - P.x[e]) ** 2 + (t.y - P.y[e]) ** 2 > 400 * 400) continue;
+              if (!t.founded || t.faction === fe || (t.x - P.x[e]) ** 2 + (t.y - P.y[e]) ** 2 > 400 * 400) continue;
               const soldiers = pop.residents(t.id).filter((x) => canFight[PR.prof[x]]).length;
               if (!intel.has(fe)) intel.set(fe, new Map());
               intel.get(fe)!.set(t.id, { tick: sim.clock.tick, town: t.name, faction: F[t.faction].name, soldiers, food: Math.round(eco.stores[t.store].stock[eco.itemIndex('food')]), walls: t.walls });
@@ -665,6 +667,7 @@ export const military: GameModule = {
         let home = pop.towns[0];
         let bd = Infinity;
         for (const t of pop.towns) {
+          if (!t.founded) continue;
           const d = (t.x - place.x) ** 2 + (t.y - place.y) ** 2;
           if (d < bd) ((bd = d), (home = t));
         }

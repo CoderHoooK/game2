@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { WebSocket } from 'ws';
 import { createGame } from '../src/game';
+import { legacy } from './helpers';
 import { Gateway, type GatewayHost } from '../src/server/gateway';
 import { backupSave, clearSaves, describeSave, prevPath, saveTo } from '../src/server/persist';
 import type { ClientMsg, ServerMsg } from '../src/protocol/messages';
@@ -16,14 +17,14 @@ describe('存档摘要 / 清空存档', () => {
   it('没有存档 → null；有存档 → 游戏内时间、种子、人数；清空后什么都不剩（含备份和临时文件）', () => {
     const file = path.join(dir(), 'auto.json.gz');
     expect(describeSave(file)).toBeNull();
-    const sim = createGame({ seed: 7, config: { population: { npcs: 50 } } });
+    const sim = createGame({ seed: 7, config: legacy(50) });
     sim.clock.tick = 100 * 31; // 第 1 年 夏 第 2 天
     saveTo(file, sim, null, { seed: 7, 'population.npcs': 50 });
     const info = describeSave(file)!;
     expect(info.error).toBeUndefined();
     expect(info.label).toBe(sim.clock.label());
     expect(info.seed).toBe(7);
-    expect(info.npcs).toBe(50);
+    expect(info.npcs).toBe(sim.world.count);
     expect(info.kb).toBeGreaterThan(0);
     expect(info.hasPrev).toBe(false);
 

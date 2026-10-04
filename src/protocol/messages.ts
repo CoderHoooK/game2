@@ -35,6 +35,8 @@ export interface TownStat {
   buildings: Record<string, number>;
   /** 工地：建筑名 + 进度 0–1 */
   sites: { name: string; progress: number }[];
+  /** false = 空城址（还没人建城，无主） */
+  founded: boolean;
   /** 被围的进度 0–1（没被围 = 不写） */
   siege?: { by: number; progress: number };
 }

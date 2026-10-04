@@ -38,7 +38,7 @@ if (await page.isVisible('#lobby')) {
     hasClose: !!document.querySelector('#lobby [data-close]'),
   }));
   console.log(`开始界面：${lobby.keys.length} 项设置，按钮 ${lobby.acts.join('/')}`);
-  for (const k of ['seed', 'population.npcs', 'aiMode']) if (!lobby.keys.includes(k)) fail(`开始界面缺 ${k}`);
+  for (const k of ['seed', 'population.startFarmer', 'aiMode']) if (!lobby.keys.includes(k)) fail(`开始界面缺 ${k}`);
   if (lobby.keys.includes('port')) fail('开始界面不该显示需要重启的服务器设置');
   if (lobby.hasClose) fail('开始界面不该能关掉');
   if (!lobby.acts.includes('start')) fail('开始界面没有开始按钮');
@@ -53,7 +53,7 @@ await ready();
 await page.waitForTimeout(3500);
 const s0 = await page.evaluate(() => window.__game.stats());
 console.log(`世界：${s0.label}，${s0.npcs} 个 NPC，每拍 ${s0.tickMs.toFixed(3)} ms`);
-if (s0.npcs < 2000) fail(`NPC 不足 2000：${s0.npcs}`);
+if (s0.npcs < 60) fail(`从零开始的开局人数不对：${s0.npcs}`);
 if (!(s0.tickMs < 5)) fail(`每拍 ${s0.tickMs} ms，超过 5 ms 预算`);
 await shot('g-start');
 
@@ -158,7 +158,7 @@ const set = await page.evaluate(() => ({
   secret: document.querySelector('[data-key="aiApiKey"] input')?.type,
 }));
 console.log(`设置面板：${set.rows} 项，${set.groups.length} 组`);
-for (const k of ['speed', 'aiMode', 'aiApiKey', 'seed', 'population.npcs', 'port']) if (!set.keys.includes(k)) fail(`设置面板缺 ${k}`);
+for (const k of ['speed', 'aiMode', 'aiApiKey', 'seed', 'population.startFarmer', 'port']) if (!set.keys.includes(k)) fail(`设置面板缺 ${k}`);
 if (set.secret !== 'password') fail('API Key 输入框应该是密码框');
 await shot('g-settings');
 await page.keyboard.press('Escape');
