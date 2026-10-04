@@ -92,6 +92,8 @@ export interface PopulationApi {
   livingFactions(kind?: FactionKind): Faction[];
   /** 开局每个营地各职业的人数（职业 ID → 人数）；jobs 开局时照这个分职业 */
   startCounts: Record<string, number>;
+  /** 空城址建成城：归 faction，人口上限 = 营地上限，仓库空，没有人（要靠人才市场招） */
+  found(town: Town, faction: number): void;
 }
 
 const TOWN_RADIUS = 45;
@@ -456,6 +458,17 @@ export const population: GameModule = {
       onRehome,
       upkeepOf: () => FOOD_PER_DAY,
       startCounts,
+      found(t, fi) {
+        if (t.founded) return;
+        const prevCapital = factions[fi].towns.find((id) => towns[id].capital);
+        t.founded = true;
+        setTownFaction(t, fi, '建城');
+        // 都城不因为新城的编号小而换人
+        if (prevCapital !== undefined) for (const id of factions[fi].towns) towns[id].capital = id === prevCapital;
+        else t.capital = true;
+        Object.assign(t, { cap: api.config.campCap as number, mood: 60, unrest: 0, fed: 1, relief: 0, pop: 0, buildings: {}, walls: 0 });
+        dirty = true;
+      },
       livingFactions: (kind) => factions.filter((f) => f.alive && (kind ? f.kind === kind : f.kind === 'lord' || f.kind === 'rebel')),
     };
     const food = eco.itemIndex('food');

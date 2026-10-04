@@ -55,6 +55,7 @@ const FMT: Record<string, Fmt> = {
   'notable.defected': (d) => ({ text: d.how === '自立' ? `${d.from} 大将 ${d.name} 拥兵自立，据 ${d.town}，号「${d.to}」。` : `${d.name} 离开 ${d.from}，投奔 ${d.to}。`, factions: [d.from, d.to] }),
   'npc.died': (d) => (d.notable ? { text: `${d.faction}${d.notable} ${d.name} ${d.cause}${d.by ? `（${d.by}）` : ''}。`, factions: [d.faction] } : null),
   'npc.migrated': (d, ev) => (d.defect ? { text: `${d.n} 名百姓从 ${d.from} 逃往 ${d.to}。`, scope: 'all' } : { text: `${d.n} 人从 ${d.from} 迁往 ${d.to}。`, scope: ev.scope }),
+  'settlement.founded': (d) => ({ text: `${d.faction} 在 ${d.town} 建成了新城。`, factions: [d.faction] }),
   'building.done': (d, ev) => ({ text: `${d.where} 的${d.building}落成。`, scope: ev.scope, factions: [d.faction] }),
   'building.destroyed': (d, ev) => ({ text: `${d.where} 的${d.building}${d.why === '拆除' ? '被拆除' : d.why}。`, scope: ev.scope }),
   'message.received': (d) =>

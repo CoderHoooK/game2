@@ -1,6 +1,6 @@
 // 从零开始的开局：每个诸侯一座营地、其余是空城址；人口、物资按设置；旧存档读不了。
 import { describe, it, expect } from 'vitest';
-import { createGame, Notable, type PopulationApi, type JobsApi, type EconomyApi, type MilitaryApi } from '../src/game';
+import { createGame, Notable, type BuildingApi, type PopulationApi, type JobsApi, type EconomyApi, type MilitaryApi } from '../src/game';
 import { saveSim, loadSim } from '../src/engine/save';
 import { PROFESSIONS } from '../content/professions';
 
@@ -120,5 +120,66 @@ describe('人才市场与「募」', () => {
     t2.buildings.talent = 1;
     e2.stores[t2.store].stock[e2.itemIndex('gold')] = 40;
     expect(s2.bus.exec('募 青石城 商:5', lord).msg).toContain('付不起');
+  });
+});
+
+describe('建城', () => {
+  const lord = (faction = '青龙') => ({ role: 'lord' as const, faction, origin: 'test' as const });
+  const bld = (s: ReturnType<typeof createGame>) => s.service<BuildingApi>('building');
+  const runUntil = (s: ReturnType<typeof createGame>, f: () => boolean, max = 8000) => {
+    for (let i = 0; i < max && !f(); i += 50) s.run(50);
+    return f();
+  };
+
+  it('空城址：花木头石头立工地，建筑工建完就归己方；城里没人、仓库空', () => {
+    const s = createGame({ seed: 1 });
+    const { P, E } = parts(s);
+    const t = P.townByName('河口镇')!;
+    expect(t.founded).toBe(false);
+    const camp = P.townByName('青石城')!;
+    const wood = () => E.stores[camp.store].stock[E.itemIndex('wood')];
+    const w0 = wood();
+    const r = s.bus.exec('建城 河口镇 @建:3', lord());
+    expect(r.ok, r.msg).toBe(true);
+    expect(w0 - wood()).toBeGreaterThanOrEqual(99); // 扣 100（营地上的伐木工会同时进一点）
+    expect(bld(s).sites.some((x) => x.town === t.id)).toBe(true);
+    expect(runUntil(s, () => t.founded)).toBe(true);
+    expect(P.factions[t.faction].name).toBe('青龙');
+    expect(P.factions.find((f) => f.name === '青龙')!.towns).toContain(t.id);
+    expect(t.capital).toBe(false); // 都城还是青石城
+    expect(camp.capital).toBe(true);
+    expect(P.residents(t.id).length).toBe(0);
+    expect(bld(s).sites.length).toBe(0);
+  });
+  it('拒绝：已建成的城、材料不够、重复立工地', () => {
+    const s = createGame({ seed: 1, config: { population: { startWood: 50 } } });
+    expect(s.bus.exec('建城 青石城', lord()).msg).toContain('不是空城址');
+    expect(s.bus.exec('建城 河口镇', lord()).msg).toContain('材料不够');
+    const s2 = createGame({ seed: 1 });
+    expect(s2.bus.exec('建城 河口镇', lord()).ok).toBe(true);
+    expect(s2.bus.exec('建城 河口镇', lord()).msg).toContain('已经');
+  });
+  it('两家抢同一个城址：先建成的得城，另一家的工地作废', () => {
+    const s = createGame({ seed: 1 });
+    const { P } = parts(s);
+    const t = P.townByName('河口镇')!;
+    expect(s.bus.exec('建城 河口镇 @建:3', lord('青龙')).ok).toBe(true);
+    expect(s.bus.exec('建城 河口镇 @建:3', lord('赤焰')).ok).toBe(true);
+    expect(runUntil(s, () => t.founded)).toBe(true);
+    expect(bld(s).sites.filter((x) => x.town === t.id).length).toBe(0);
+  });
+  it('新城能招人：建人才市场 + 募', () => {
+    const s = createGame({ seed: 1 });
+    const { P, E } = parts(s);
+    const t = P.townByName('河口镇')!;
+    s.bus.exec('建城 河口镇 @建:3', lord());
+    expect(runUntil(s, () => t.founded)).toBe(true);
+    E.stores[t.store].stock[E.itemIndex('gold')] = 500;
+    E.stores[t.store].stock[E.itemIndex('food')] = 500;
+    E.stores[t.store].stock[E.itemIndex('wood')] = 500;
+    expect(s.bus.exec('建 人才市场 河口镇 @建:3', lord()).ok).toBe(true);
+    expect(runUntil(s, () => (t.buildings.talent ?? 0) > 0)).toBe(true);
+    expect(s.bus.exec('募 河口镇 农:3', lord()).ok).toBe(true);
+    expect(P.residents(t.id).length).toBe(3);
   });
 });

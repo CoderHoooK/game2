@@ -126,10 +126,11 @@ describe('命令契约', () => {
     s.service<PopulationApi>('population').townByName('青石城')!.buildings.talent = 1; // 例子「募 青石城 …」要用
     expect(s.bus.exec('约 青龙 互不侵犯 30天', lord('赤焰')).ok).toBe(true);
     const fails: string[] = [];
+    const scratch = createGame({ seed: 1 }); // 「建城」的例子要在有空城址的从零开局里跑
     for (const c of s.bus.list()) {
       for (const ex of c.examples) {
         const src = c.who.includes('lord') ? lord() : god;
-        const r = s.bus.exec(ex, src);
+        const r = (c.id === 'foundCity' ? scratch : s).bus.exec(ex, src);
         if (!r.ok) fails.push(`${ex} → ${r.msg}`);
       }
     }

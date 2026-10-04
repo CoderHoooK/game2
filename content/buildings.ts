@@ -1,6 +1,9 @@
 import type { BuildingDef } from '../src/shared/content';
 
 // 建筑 = 数据。效果在建造模块里按 id 实现。
+// 建城：不算普通建筑（不在「建」的清单里），用「建城」命令立工地；建成后空城址变成归己方的营地
+export const CITY: BuildingDef = { id: 'city', name: '新城', site: 'town', cost: { wood: 100, stone: 40 }, work: 300, max: 1, text: '在空城址上建一座新营地（人口上限同营地，仓库是空的）' };
+
 export const BUILDINGS: BuildingDef[] = [
   { id: 'house', name: '房屋', site: 'town', cost: { wood: 40 }, work: 120, max: 20, text: '人口上限 +30' },
   { id: 'farm', name: '农田', site: 'town', cost: { wood: 20 }, work: 80, max: 10, text: '城边多 6 块田' },

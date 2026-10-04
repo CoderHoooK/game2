@@ -13,7 +13,7 @@ import type { EconomyApi } from '../economy';
 import { Identity, type PopulationApi, type Town } from '../population';
 import { Profession, type JobsApi, type PlaceParam } from '../jobs';
 import type { Place, WorldApi } from '../world';
-import { BUILDINGS } from '../../../../content/buildings';
+import { BUILDINGS, CITY } from '../../../../content/buildings';
 
 export interface Site {
   id: number;
@@ -48,6 +48,7 @@ export const building: GameModule = {
   events: [
     { id: 'building.done', module: 'building', text: '建筑完工' },
     { id: 'building.destroyed', module: 'building', text: '建筑被拆或被毁' },
+    { id: 'settlement.founded', module: 'building', text: '空城址建成了新城' },
   ],
   argTypes: [
     {
@@ -84,7 +85,7 @@ export const building: GameModule = {
     const sites: Site[] = [];
     let nextId = 1;
     const regionB = new Map<number, Record<string, number>>();
-    const def = (id: string) => BUILDINGS.find((b) => b.id === id);
+    const def = (id: string) => (id === CITY.id ? CITY : BUILDINGS.find((b) => b.id === id));
     const count = (t: Town | null, region: number, id: string) =>
       (t ? t.buildings[id] ?? 0 : regionB.get(region)?.[id] ?? 0) + sites.filter((s) => s.building === id && (t ? s.town === t.id : s.region === region)).length;
 
@@ -107,6 +108,23 @@ export const building: GameModule = {
         const kind = REGION_KIND[s.building];
         if (kind) world.setRegenMul(s.region, kind, r[s.building] > 0 ? 3 : 1);
       }
+    };
+
+    // ---- 建城：先建成的得城；同一城址上别人的工地作废，材料退回他们最近的城
+    const refund = (s: Site) => {
+      const back = pop.nearestTown(s.faction, s.x, s.y);
+      if (back) eco.give(back.store, Object.entries(CITY.cost));
+    };
+    const finishCity = (s: Site) => {
+      const t = pop.towns[s.town];
+      sites.splice(sites.indexOf(s), 1);
+      if (t.founded || !pop.factions[s.faction].alive) return refund(s);
+      pop.found(t, s.faction);
+      for (const o of sites.filter((x) => x.building === CITY.id && x.town === t.id)) {
+        sites.splice(sites.indexOf(o), 1);
+        refund(o);
+      }
+      sim.events.emit('settlement.founded', sim.clock.tick, { town: t.name, faction: pop.factions[s.faction].name }, 'all');
     };
 
     // ---- 施工行为
@@ -155,7 +173,9 @@ export const building: GameModule = {
         s.progress += 5 * (1 + PR.skill[e] / 200);
         PR.skill[e] = Math.min(100, PR.skill[e] + 1);
         const d = def(s.building)!;
-        if (s.progress >= d.work) {
+        if (s.progress >= d.work && s.building === CITY.id) {
+          finishCity(s);
+        } else if (s.progress >= d.work) {
           sites.splice(sites.indexOf(s), 1);
           apply(s, 1);
           const where = s.town >= 0 ? pop.towns[s.town].name : world.map.regions[s.region].name;
@@ -210,6 +230,37 @@ export const building: GameModule = {
           const warns: string[] = [];
           if (a['人']) {
             const r = jobs.dispatch(src, sim.bus.select(a['人'] as Selector, src), 'build', { place }, `建${d.name} @ ${place.name}`);
+            msg += '；' + r.msg;
+            warns.push(...(r.warns ?? []));
+          }
+          return { ok: true, msg, warns };
+        },
+      },
+      {
+        id: 'foundCity',
+        verb: '建城',
+        aliases: ['found'],
+        who: ['lord'],
+        order: 'build',
+        args: [['城址', 'place'], ['人?', 'sel']],
+        help: '在空城址上建一座新城（马上扣木头石头，建筑工去施工；别的诸侯也可能抢先建成）。建成后城里没有人，要靠人才市场招',
+        examples: ['建城 河口镇'],
+        run({ src }, a) {
+          const place = a['城址'] as Place;
+          if (place.kind !== 'town') return { ok: false, msg: '「建城」要写空城址的名字' };
+          const t = pop.towns[place.id];
+          const fi = pop.factionIndex(src.faction!);
+          if (t.founded) return { ok: false, msg: `${t.name} 已经是${pop.factions[t.faction].name}的城了，不是空城址（想要它得打下来）` };
+          if (!pop.factions[fi].towns.length) return { ok: false, msg: '你没有城了，没法出人出料建新城' };
+          if (sites.some((s) => s.building === CITY.id && s.town === t.id && s.faction === fi)) return { ok: false, msg: `你已经在 ${t.name} 立了工地` };
+          const from = pop.nearestTown(fi, t.x, t.y)!;
+          const cost = Object.entries(CITY.cost) as [string, number][];
+          if (!eco.take(from.store, cost)) return { ok: false, msg: `材料不够（从 ${from.name} 的仓库出）：要 ${cost.map(([k, v]) => eco.items[eco.itemIndex(k)].name + v).join('、')}` };
+          sites.push({ id: nextId++, building: CITY.id, faction: fi, town: t.id, region: t.region, x: t.x, y: t.y, progress: 0 });
+          let msg = `${t.name} 开工建城（要 ${CITY.work} 工时）`;
+          const warns: string[] = [];
+          if (a['人']) {
+            const r = jobs.dispatch(src, sim.bus.select(a['人'] as Selector, src), 'build', { place }, `建城 @ ${t.name}`);
             msg += '；' + r.msg;
             warns.push(...(r.warns ?? []));
           }
